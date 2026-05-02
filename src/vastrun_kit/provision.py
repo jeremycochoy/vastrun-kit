@@ -24,12 +24,14 @@ def resolve_offer(offer_id: int) -> dict:
     A blank `search offers` returns a small scored slice of the marketplace
     that often misses individual offers; replaying the package's safety-floor
     query (the same one `vastrun-search` uses) returns a focused result set
-    that consistently includes them. We try datacenter offers first, then
-    prosumer; whichever set the user just picked from is the one that hits."""
-    for filters in (offers.OfferFilters(), offers.OfferFilters(prosumer=True)):
-        for r in _search_offers(offers.build_offer_query(filters)):
-            if r.get("id") == offer_id:
-                return r
+    that consistently includes them.
+
+    Datacenter only: prosumer offers are deliberately not searched —
+    `vastrun-search` is datacenter-only by default and never silently widens,
+    so neither do we. (See docs/vastai-cli-quirks.md.)"""
+    for r in _search_offers(offers.build_offer_query(offers.OfferFilters())):
+        if r.get("id") == offer_id:
+            return r
     raise errors.OfferUnavailableError(
         f"Offer {offer_id} is no longer available. Run `vastrun-search` to list current offers."
     )
