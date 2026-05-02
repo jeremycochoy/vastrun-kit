@@ -345,6 +345,35 @@ def test_no_match_safety_floors_get_non_negotiable_tag():
     assert "direct ports" in text
 
 
+def test_no_match_user_raised_reliability_drops_non_negotiable_tag():
+    # When the user raises min_reliability above the 0.95 floor, the listing
+    # must treat it as user-chosen (no "non-negotiable" tag) — only the floor
+    # itself is non-negotiable, not the user's stricter threshold.
+    f = OfferFilters(min_reliability=0.97)
+    log = [("max_bid", 0), ("driver_version", 0), ("cuda_max_good", 0),
+           ("country", 0), ("region", 0), ("min_upload_mbps", 0),
+           ("min_download_mbps", 0), ("min_tflops", 0), ("min_vram_gb", 0),
+           ("gpu_name", 0), ("datacenter", 0)]
+    text = render_no_match_diagnostic(f, total_candidates=10, exclusion_log=log)
+    rel_line = next(line for line in text.splitlines() if "reliability" in line)
+    assert "0.97" in rel_line
+    assert "non-negotiable" not in rel_line
+
+
+def test_no_match_user_raised_reliability_can_be_binding_filter():
+    # SPEC §no-match diagnostic explicitly lists `min_reliability above the
+    # safety floor` as a candidate for the binding filter.
+    f = OfferFilters(min_reliability=0.99)
+    log = [("max_bid", 0), ("driver_version", 0), ("cuda_max_good", 0),
+           ("country", 0), ("region", 0), ("min_upload_mbps", 0),
+           ("min_download_mbps", 0), ("min_tflops", 0), ("min_vram_gb", 0),
+           ("gpu_name", 0), ("datacenter", 0), ("min_reliability", 60)]
+    text = render_no_match_diagnostic(f, total_candidates=80, exclusion_log=log)
+    binding_line = next(line for line in text.splitlines() if "Binding filter" in line)
+    assert "reliability" in binding_line
+    assert "0.99" in binding_line
+
+
 def test_no_match_datacenter_zero_offers_lists_prosumer_as_possible_not_recommended():
     f = OfferFilters()
     log = [("max_bid", 0), ("driver_version", 0), ("cuda_max_good", 0),
