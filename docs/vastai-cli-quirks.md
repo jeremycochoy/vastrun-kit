@@ -29,17 +29,17 @@ with `--limit 10000`, and the rows are an internally-ranked subset.
 Specific offers shown by `vastrun-search` moments earlier are routinely
 absent from a blank-query result.
 
-Workaround: target searches with the package's safety-floor query —
-`reliability>0.95 direct_port_count>=1 disk_space>=50 disk_bw>=500 inet_down>500 num_gpus>=1 total_flops>=80 datacenter=True`
-— consistently include datacenter offers the user just chose.
-`provision.resolve_offer` uses this same query.
+Workaround: target searches with the package's safety-floor constraints
+(reliability, disk, inet, num_gpus, total_flops). `provision.resolve_offer`
+queries TWO scored slices — datacenter first, then non-datacenter —
+because the two slices are mostly disjoint and either may contain the
+offer the user picked. The `id` filter on the client side guarantees we
+return that specific offer or fail; we never substitute a different
+machine.
 
-Note: prosumer offers (`datacenter=False`) are deliberately not searched
-by `resolve_offer`. The package treats datacenter as a safety floor; if
-the user is on the spec'd path they only ever pass `vastrun-search`'s
-default datacenter offers to `vastrun-provision`. Provisioning prosumer
-offers is not currently a supported flow (it would need a new flag on
-`vastrun-provision`, which the spec does not include).
+There is no user-facing flag for this on `vastrun-provision`: the offer
+id is unique, so its datacenter classification is purely an internal
+search-routing detail and irrelevant to the user.
 
 ## `vastai destroy instance <id>` prompts for confirmation by default
 

@@ -73,13 +73,7 @@ def patch_flow(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, Any
         "geolocation": "United States, US",
     }
 
-    seen["resolve_calls"] = []
-
-    def fake_resolve(oid, *, prosumer=False):
-        seen["resolve_calls"].append({"offer_id": oid, "prosumer": prosumer})
-        return offer
-
-    monkeypatch.setattr(provision_cli.provision, "resolve_offer", fake_resolve)
+    monkeypatch.setattr(provision_cli.provision, "resolve_offer", lambda oid: offer)
     monkeypatch.setattr(provision_cli.provision, "check_balance", lambda: 25.0)
 
     def fake_create(offer_id, *, image, label, ssh_pubkey, spot_bid):
@@ -173,26 +167,6 @@ def test_happy_path_on_demand_prints_summary(patch_flow: dict[str, Any]) -> None
     assert label_calls and "training-v1" in label_calls[0]
 
 
-def test_default_resolves_offer_without_prosumer(patch_flow: dict[str, Any]) -> None:
-    """No --prosumer → resolve_offer called with prosumer=False (datacenter only)."""
-    result = runner.invoke(
-        provision_cli.app,
-        ["8765432", "--label", "v1", "--ssh-key", patch_flow["pub_path"]],
-    )
-    assert result.exit_code == 0
-    assert patch_flow["resolve_calls"] == [{"offer_id": 8765432, "prosumer": False}]
-
-
-def test_prosumer_flag_passes_through(patch_flow: dict[str, Any]) -> None:
-    """--prosumer is the user's explicit opt-in for non-datacenter offers."""
-    result = runner.invoke(
-        provision_cli.app,
-        ["8765432", "--label", "v1", "--ssh-key", patch_flow["pub_path"], "--prosumer"],
-    )
-    assert result.exit_code == 0
-    assert patch_flow["resolve_calls"] == [{"offer_id": 8765432, "prosumer": True}]
-
-
 def test_happy_path_spot_uses_min_bid_times_multiplier(patch_flow: dict[str, Any]) -> None:
     result = runner.invoke(
         provision_cli.app,
@@ -225,7 +199,7 @@ def test_no_vastrun_toml_exits_1(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 def test_offer_unavailable_exits_1(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, patch_flow: dict[str, Any]
 ) -> None:
-    def boom(_oid, *, prosumer=False):
+    def boom(_oid):
         raise errors.OfferUnavailableError("offer 8765432 is gone")
 
     monkeypatch.setattr(provision_cli.provision, "resolve_offer", boom)

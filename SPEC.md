@@ -228,7 +228,6 @@ Provision exactly one fresh GPU instance from a specific offer ID (typically pic
 | `--spot` | no | off | Bid as interruptible (`min_bid * BID_MULTIPLIER`, capped at `MAX_BID`). Default is on-demand at `dph_total`. |
 | `--image IMAGE` | no | `.vastrun.toml` `vast.image` → `BLACKWELL_IMAGE` if the offer is Blackwell, else `IMAGE` | Docker image override. Must contain `:`. |
 | `--ssh-key PATH` | no | autodiscovered from `SSH_PUBKEY_CANDIDATES` | Local SSH public key. |
-| `--prosumer` | no | off | Allows non-datacenter offers — match the flag you passed to `vastrun-search`. There is no silent fallback: provisioning a prosumer offer requires this explicit opt-in. Datacenter exists for reliability; do not pass `--prosumer` unless you accept preemption risk. |
 
 Behaviour: follows [Provision flow](#provision-flow). On success, print, in this order:
 
