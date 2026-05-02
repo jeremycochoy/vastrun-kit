@@ -17,7 +17,7 @@ def _search_offers(query: str) -> list[dict]:
     return payload[0] if (payload and isinstance(payload[0], list)) else payload
 
 
-def resolve_offer(offer_id: int) -> dict:
+def resolve_offer(offer_id: int, *, prosumer: bool = False) -> dict:
     """Find offer dict by `id`. Vast.ai's `search offers id=X` is a no-op —
     the `id` query field refers to instance ids, not offer/contract ids.
 
@@ -26,10 +26,12 @@ def resolve_offer(offer_id: int) -> dict:
     query (the same one `vastrun-search` uses) returns a focused result set
     that consistently includes them.
 
-    Datacenter only: prosumer offers are deliberately not searched —
-    `vastrun-search` is datacenter-only by default and never silently widens,
-    so neither do we. (See docs/vastai-cli-quirks.md.)"""
-    for r in _search_offers(offers.build_offer_query(offers.OfferFilters())):
+    `prosumer=False` (default) searches datacenter only — same scope as
+    `vastrun-search` without `--prosumer`. There is no silent fallback:
+    if the user intentionally picked a prosumer offer, they must opt in
+    explicitly at the provision call site. (See docs/vastai-cli-quirks.md.)"""
+    f = offers.OfferFilters(prosumer=True) if prosumer else offers.OfferFilters()
+    for r in _search_offers(offers.build_offer_query(f)):
         if r.get("id") == offer_id:
             return r
     raise errors.OfferUnavailableError(
