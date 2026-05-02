@@ -11,7 +11,7 @@ Behaviour under test (from SPEC > vastrun-exec):
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import time
 
 import pytest
 from typer.testing import CliRunner
@@ -128,7 +128,8 @@ def test_endpoint_none_exits_1(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_footer_prints_after_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    start = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+    # start_date is a Unix epoch float in real Vast.ai payloads
+    start = time.time() - 2 * 3600
     inst = {"id": 12345, "dph_total": 0.50, "start_date": start}
     seen = _patch_ssh(monkeypatch, rcs=[0], find=inst)
     result = runner.invoke(exec_cmd.app, ["12345", "true"])
@@ -150,7 +151,7 @@ def test_footer_silent_on_exception(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_footer_prints_once_after_255_retry(monkeypatch: pytest.MonkeyPatch) -> None:
     """The footer must not double-print across the retry."""
-    start = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    start = time.time() - 3600
     inst = {"id": 12345, "dph_total": 1.00, "start_date": start}
     seen = _patch_ssh(monkeypatch, rcs=[255, 0], find=inst)
     result = runner.invoke(exec_cmd.app, ["12345", "true"])

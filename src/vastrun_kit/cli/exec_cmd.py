@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import sys
 import time
-from datetime import datetime, timezone
 
 import typer
 
@@ -24,20 +23,18 @@ _SSH_RETRY_SLEEP_SECONDS = 3
 
 
 def _print_spent_footer(inst_id: int) -> None:
-    """Best-effort cost-so-far line on stderr; silent on any exception."""
+    """Best-effort cost-so-far line on stderr; silent on any exception.
+
+    `start_date` is a Unix epoch float in `vastai show instances` payloads.
+    """
     try:
         inst = instances.find_instance(inst_id)
         if not inst:
             return
-        dph = inst.get("dph_total")
-        start = inst.get("start_date")
+        dph, start = inst.get("dph_total"), inst.get("start_date")
         if dph is None or start is None:
             return
-        start_dt = datetime.fromisoformat(str(start))
-        if start_dt.tzinfo is None:
-            start_dt = start_dt.replace(tzinfo=timezone.utc)
-        elapsed = (datetime.now(timezone.utc) - start_dt).total_seconds()
-        spent = max(0.0, elapsed) / 3600.0 * float(dph)
+        spent = max(0.0, time.time() - float(start)) / 3600.0 * float(dph)
         print(f"Instance {inst_id}: ${spent:.2f} spent so far", file=sys.stderr)
     except Exception:
         return
