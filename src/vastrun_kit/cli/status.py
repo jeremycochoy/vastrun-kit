@@ -13,30 +13,16 @@ import time
 
 import typer
 
-from .. import _table, errors, instances, ssh
+from .. import _format, _table, errors, instances, ssh
 
 app = typer.Typer(add_completion=False)
 
 _HEADERS = ("ID", "Label", "Status", "GPU", "Uptime", "Cost/h", "Spent", "SSH Address")
 
-
-def _format_uptime(start: float | None, now: float) -> str:
-    if start is None:
-        return "-"
-    mins = int((now - start) // 60)
-    if mins < 0:
-        return "-"
-    return f"{mins // 60}h {mins % 60}m" if mins >= 60 else f"{mins}m"
-
-
-def _format_money_per_hour(dph: float | None) -> str:
-    return f"${dph:.4f}" if dph is not None else "-"
-
-
-def _format_spent(start: float | None, now: float, dph: float | None) -> str:
-    if start is None or dph is None or now < start:
-        return "-"
-    return f"${(now - start) / 3600 * dph:.2f}"
+# Re-export shared formatters under the private names existing tests expect.
+_format_uptime = _format.format_uptime
+_format_money_per_hour = _format.format_money_per_hour
+_format_spent = _format.format_spent
 
 
 def _format_ssh_address(inst: dict) -> str:
