@@ -13,7 +13,7 @@ import time
 
 import typer
 
-from .. import errors, instances, ssh
+from .. import _table, errors, instances, ssh
 
 app = typer.Typer(add_completion=False)
 
@@ -60,12 +60,7 @@ def _row_cells(inst: dict, now: float) -> tuple[str, ...]:
 
 def _render_table(rows: list[dict], now: float) -> str:
     body = [_row_cells(r, now) for r in rows]
-    widths = [max(len(c) for c in col) for col in zip(_HEADERS, *body)]
-    fmt = "  ".join(f"{{:<{w}}}" for w in widths)
-    lines = [fmt.format(*_HEADERS), *(fmt.format(*r) for r in body)]
-    n = len(rows)
-    lines.append(f"Total: {n} instance(s)")
-    return "\n".join(lines)
+    return f"{_table.render_table(_HEADERS, body)}\nTotal: {len(rows)} instance(s)"
 
 
 def _print_snapshot() -> None:
