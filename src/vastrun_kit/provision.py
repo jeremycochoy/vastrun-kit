@@ -5,22 +5,31 @@ from __future__ import annotations
 import json
 import re
 
-from . import config, errors, instances, vastai_cli
+from . import config, errors, instances, offers, vastai_cli
 
 # Match `new_contract` in raw JSON, or `instance id is <N>` in plain stdout.
 _INST_ID_RE = re.compile(r"(?:['\"]new_contract['\"]\s*:\s*|instance\s+id\s+is\s+)(\d+)", re.IGNORECASE)
 _RECOVER = "Run `vastrun-status` and `vastrun-destroy <id> --force` if leaked."
 
 
+def _search_offers(query: str) -> list[dict]:
+    payload = vastai_cli.run_vastai_raw(["search", "offers", query, "--limit", "10000"])
+    return payload[0] if (payload and isinstance(payload[0], list)) else payload
+
+
 def resolve_offer(offer_id: int) -> dict:
-    """Find offer dict by `id`. Vast.ai's `search offers id=X` does NOT filter
-    by offer/contract id (the `id` query field refers to instance ids, not
-    offer ids), so we do a broad search and pick the row client-side."""
-    payload = vastai_cli.run_vastai_raw(["search", "offers", "--limit", "10000"])
-    rows = payload[0] if (payload and isinstance(payload[0], list)) else payload
-    for r in rows:
-        if r.get("id") == offer_id:
-            return r
+    """Find offer dict by `id`. Vast.ai's `search offers id=X` is a no-op —
+    the `id` query field refers to instance ids, not offer/contract ids.
+
+    A blank `search offers` returns a small scored slice of the marketplace
+    that often misses individual offers; replaying the package's safety-floor
+    query (the same one `vastrun-search` uses) returns a focused result set
+    that consistently includes them. We try datacenter offers first, then
+    prosumer; whichever set the user just picked from is the one that hits."""
+    for filters in (offers.OfferFilters(), offers.OfferFilters(prosumer=True)):
+        for r in _search_offers(offers.build_offer_query(filters)):
+            if r.get("id") == offer_id:
+                return r
     raise errors.OfferUnavailableError(
         f"Offer {offer_id} is no longer available. Run `vastrun-search` to list current offers."
     )
