@@ -153,7 +153,7 @@ def test_verify_destroyed_still_running_after_two_rounds_returns_false(
     # 6 polls in round 1 + 6 polls in round 2 = 12 polls
     assert calls["find"] == 12
     # Second destroy invoked exactly once between rounds
-    assert calls["destroy_argv"] == [["destroy", "instance", "12345"]]
+    assert calls["destroy_argv"] == [["destroy", "instance", "12345", "-y"]]
 
 
 def test_verify_destroyed_recovers_in_second_round(

@@ -39,7 +39,7 @@ def _fail(msg: str) -> typer.Exit:
 
 def _destroy_one(inst_id: int) -> bool:
     """Issue destroy + verify. Returns True if verified."""
-    vastai_cli.run_vastai(["destroy", "instance", str(inst_id)])
+    vastai_cli.run_vastai(["destroy", "instance", str(inst_id), "-y"])
     return destroy.verify_destroyed(inst_id)
 
 

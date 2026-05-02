@@ -31,7 +31,7 @@ def verify_destroyed(inst_id: int) -> bool:
     poll another 30s. Still alive after that → False."""
     if _poll_until_terminal(inst_id):
         return True
-    vastai_cli.run_vastai(["destroy", "instance", str(inst_id)])
+    vastai_cli.run_vastai(["destroy", "instance", str(inst_id), "-y"])
     return _poll_until_terminal(inst_id)
 
 
