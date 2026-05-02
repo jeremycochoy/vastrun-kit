@@ -1,0 +1,43 @@
+[project]
+name = "vastrun-kit"
+version = "0.1.0"
+description = "AWS-grade reliability for GPU compute at Vast.ai prices."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "vastai>=1.0.8",
+    "typer>=0.12",
+    "rich>=13",
+]
+
+[project.scripts]
+vastrun-init       = "vastrun_kit.cli.init:app"
+vastrun-search     = "vastrun_kit.cli.search:app"
+vastrun-provision  = "vastrun_kit.cli.provision:app"
+vastrun-destroy    = "vastrun_kit.cli.destroy:app"
+vastrun-restart    = "vastrun_kit.cli.restart:app"
+vastrun-rename     = "vastrun_kit.cli.rename:app"
+vastrun-bid        = "vastrun_kit.cli.bid:app"
+vastrun-exec       = "vastrun_kit.cli.exec_cmd:app"
+vastrun-status     = "vastrun_kit.cli.status:app"
+vastrun-balance    = "vastrun_kit.cli.balance:app"
+vastrun-forward    = "vastrun_kit.cli.forward:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vastrun_kit"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: hits the live Vast.ai API, needs VASTAI_API_TOKEN",
+]
+addopts = "-q"
