@@ -8,7 +8,6 @@ agent consumers must read the table without paying tokens for box drawing.
 from __future__ import annotations
 
 import json
-import os
 import sys
 import time
 
@@ -16,7 +15,7 @@ import typer
 
 from .. import errors, instances, ssh
 
-app = typer.Typer(add_completion=False, no_args_is_help=False)
+app = typer.Typer(add_completion=False)
 
 _HEADERS = ("ID", "Label", "Status", "GPU", "Uptime", "Cost/h", "Spent", "SSH Address")
 
@@ -77,12 +76,13 @@ def _print_snapshot() -> None:
     typer.echo(_render_table(rows, time.time()))
 
 
-@app.callback(invoke_without_command=True)
+@app.command()
 def main(
     json_out: bool = typer.Option(False, "--json", help="Emit raw show-instances JSON."),
     watch: bool = typer.Option(False, "--watch", "-w", help="Block and reprint every --interval seconds."),
     interval: int = typer.Option(5, "--interval", help="Refresh interval in seconds (≥ 1, used with --watch)."),
 ) -> None:
+    """List every instance on the account."""
     if watch and interval < 1:
         typer.echo("Error: --interval must be ≥ 1.", err=True)
         raise typer.Exit(1)
