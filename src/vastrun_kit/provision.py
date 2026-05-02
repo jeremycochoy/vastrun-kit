@@ -13,14 +13,17 @@ _RECOVER = "Run `vastrun-status` and `vastrun-destroy <id> --force` if leaked."
 
 
 def resolve_offer(offer_id: int) -> dict:
-    """`vastai search offers id=<X>` → single offer dict; empty raises OfferUnavailableError."""
-    payload = vastai_cli.run_vastai_raw(["search", "offers", f"id={offer_id}"])
+    """Find offer dict by `id`. Vast.ai's `search offers id=X` does NOT filter
+    by offer/contract id (the `id` query field refers to instance ids, not
+    offer ids), so we do a broad search and pick the row client-side."""
+    payload = vastai_cli.run_vastai_raw(["search", "offers", "--limit", "10000"])
     rows = payload[0] if (payload and isinstance(payload[0], list)) else payload
-    if not rows:
-        raise errors.OfferUnavailableError(
-            f"Offer {offer_id} is no longer available. Run `vastrun-search` to list current offers."
-        )
-    return rows[0]
+    for r in rows:
+        if r.get("id") == offer_id:
+            return r
+    raise errors.OfferUnavailableError(
+        f"Offer {offer_id} is no longer available. Run `vastrun-search` to list current offers."
+    )
 
 
 def resolve_image(offer: dict, *, override: str | None) -> str:

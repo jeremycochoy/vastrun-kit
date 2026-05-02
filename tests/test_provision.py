@@ -17,9 +17,13 @@ from vastrun_kit import config, errors, provision
 
 # ---------- resolve_offer ----------
 
-def test_resolve_offer_returns_single_dict(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resolve_offer_finds_match_in_broad_search(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[list[str]] = []
-    payload = [[{"id": 8765432, "gpu_name": "RTX 4090"}]]
+    payload = [[
+        {"id": 1, "gpu_name": "RTX 3090"},
+        {"id": 8765432, "gpu_name": "RTX 4090"},
+        {"id": 2, "gpu_name": "RTX 4080"},
+    ]]
 
     def fake(args, **kw):  # noqa: ANN001
         seen.append(args)
@@ -28,29 +32,29 @@ def test_resolve_offer_returns_single_dict(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(provision.vastai_cli, "run_vastai_raw", fake)
     out = provision.resolve_offer(8765432)
     assert out == {"id": 8765432, "gpu_name": "RTX 4090"}
-    # Issued one search-offers id=<X> call.
+    # Issued one broad search-offers call (no `id=X` filter — that's a no-op in Vast.ai).
     assert len(seen) == 1
     assert seen[0][:2] == ["search", "offers"]
-    assert any("id=8765432" in a for a in seen[0])
+    assert not any("id=" in a for a in seen[0])
 
 
-def test_resolve_offer_flat_list_returns_single_dict(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`vastai search offers id=X --raw` may return a flat list rather than nested."""
+def test_resolve_offer_flat_list_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The vastai response may be a flat list rather than nested."""
     payload = [{"id": 8765432, "gpu_name": "RTX 4090"}]
     monkeypatch.setattr(provision.vastai_cli, "run_vastai_raw", lambda args, **kw: payload)
     assert provision.resolve_offer(8765432) == {"id": 8765432, "gpu_name": "RTX 4090"}
 
 
-def test_resolve_offer_empty_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(provision.vastai_cli, "run_vastai_raw", lambda args, **kw: [])
+def test_resolve_offer_no_match_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = [{"id": 1}, {"id": 2}]
+    monkeypatch.setattr(provision.vastai_cli, "run_vastai_raw", lambda args, **kw: payload)
     with pytest.raises(errors.OfferUnavailableError) as exc:
         provision.resolve_offer(99999999)
-    # Message names the offer id.
     assert "99999999" in str(exc.value)
 
 
-def test_resolve_offer_nested_empty_raises(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(provision.vastai_cli, "run_vastai_raw", lambda args, **kw: [[]])
+def test_resolve_offer_empty_payload_raises(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(provision.vastai_cli, "run_vastai_raw", lambda args, **kw: [])
     with pytest.raises(errors.OfferUnavailableError):
         provision.resolve_offer(123)
 
