@@ -17,23 +17,20 @@ def _search_offers(query: str) -> list[dict]:
     return payload[0] if (payload and isinstance(payload[0], list)) else payload
 
 
-def resolve_offer(offer_id: int, *, prosumer: bool = False) -> dict:
+def resolve_offer(offer_id: int) -> dict:
     """Find offer dict by `id`. Vast.ai's `search offers id=X` is a no-op —
-    the `id` query field refers to instance ids, not offer/contract ids.
+    the `id` query field refers to instance ids, not offer/contract ids,
+    and the API only returns a scored slice for any single search.
 
-    A blank `search offers` returns a small scored slice of the marketplace
-    that often misses individual offers; replaying the package's safety-floor
-    query (the same one `vastrun-search` uses) returns a focused result set
-    that consistently includes them.
-
-    `prosumer=False` (default) searches datacenter only — same scope as
-    `vastrun-search` without `--prosumer`. There is no silent fallback:
-    if the user intentionally picked a prosumer offer, they must opt in
-    explicitly at the provision call site. (See docs/vastai-cli-quirks.md.)"""
-    f = offers.OfferFilters(prosumer=True) if prosumer else offers.OfferFilters()
-    for r in _search_offers(offers.build_offer_query(f)):
-        if r.get("id") == offer_id:
-            return r
+    The two scored slices (datacenter and non-datacenter) are mostly
+    disjoint, so we query both and pick the row whose `id` matches.
+    Filtering on `id` means we ALWAYS return the user's specific offer
+    or fail; we never substitute a different machine. (See
+    docs/vastai-cli-quirks.md.)"""
+    for f in (offers.OfferFilters(), offers.OfferFilters(prosumer=True)):
+        for r in _search_offers(offers.build_offer_query(f)):
+            if r.get("id") == offer_id:
+                return r
     raise errors.OfferUnavailableError(
         f"Offer {offer_id} is no longer available. Run `vastrun-search` to list current offers."
     )
