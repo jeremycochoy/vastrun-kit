@@ -10,11 +10,13 @@ DRIVER_FLOOR = (550, 0, 0)
 # First-match-wins order: a row excluded by filter X is not re-counted by Y,
 # so the binding-filter heuristic (max single count) is meaningful.
 _FILTER_ORDER = (
-    "max_bid", "driver_version", "cuda_max_good", "country", "region",
-    "min_upload_mbps", "min_download_mbps", "min_tflops", "min_vram_gb",
-    "gpu_name", "datacenter",
+    "max_bid", "driver_version", "cuda_max_good", "min_reliability",
+    "country", "region", "min_upload_mbps", "min_download_mbps",
+    "min_tflops", "min_vram_gb", "gpu_name", "datacenter",
 )
 _NON_NEGOTIABLE = {"driver_version", "cuda_max_good"}
+# Always-listed in the active-filters block, even at zero count.
+_ALWAYS_SHOWN = _NON_NEGOTIABLE | {"datacenter", "min_reliability"}
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,9 @@ def _excluded_by(row: dict, f: OfferFilters, region_set: set[str] | None) -> str
     cuda = row.get("cuda_max_good") or 0
     if cuda and cuda < config.CUDA_VERSION_MIN:
         return "cuda_max_good"
+    rel = row.get("reliability2")
+    if rel is not None and rel < f.min_reliability:
+        return "min_reliability"
     cc = row.get("geolocation", "").rsplit(",", 1)[-1].strip().upper()
     if f.country is not None and cc != f.country.strip().upper():
         return "country"
@@ -147,6 +152,7 @@ def _user_chose(name: str, f: OfferFilters) -> bool:
             and f.min_download_mbps > config.BANDWIDTH_DOWN_MBPS_MIN
         ),
         "min_tflops": f.min_tflops is not None and f.min_tflops > config.TFLOPS_PER_GPU_MIN,
+        "min_reliability": f.min_reliability > config.RELIABILITY_MIN,
     }.get(name, False)
 
 
@@ -157,6 +163,7 @@ def _label(name: str, f: OfferFilters) -> str:
     return {
         "max_bid": f"max_bid=${mb}/h", "driver_version": "driver ≥ 550",
         "cuda_max_good": f"CUDA ≥ {config.CUDA_VERSION_MIN}",
+        "min_reliability": f"reliability ≥ {f.min_reliability}",
         "country": f"country={f.country}", "region": f"region={f.region}",
         "min_upload_mbps": f"min_upload_mbps={f.min_upload_mbps}",
         "min_download_mbps": f"min_download_mbps={dl}",
@@ -165,7 +172,10 @@ def _label(name: str, f: OfferFilters) -> str:
     }.get(name, name)
 
 
-def _tag(name: str) -> str:
+def _tag(name: str, f: OfferFilters) -> str:
+    if name == "min_reliability":
+        # Floor itself is non-negotiable; user-raised threshold is their choice.
+        return "" if _user_chose(name, f) else " (safety floor — non-negotiable)"
     if name in _NON_NEGOTIABLE:
         return " (safety floor — non-negotiable)"
     if name == "datacenter":
@@ -188,22 +198,21 @@ def render_no_match_diagnostic(
             ((counts.get(n, 0), n) for n in counts if not _user_chose(n, f)), default=(0, "")
         )
         binding = (
-            f"Binding filter: {_label(name, f)}{_tag(name)} excluded {c} of {total_candidates} candidates."
+            f"Binding filter: {_label(name, f)}{_tag(name, f)} excluded {c} of {total_candidates} candidates."
             if c > 0 else f"No offers matched out of {total_candidates} candidates."
         )
 
     lines = [
         f"No offers matched ({total_candidates} candidates before filters).", binding, "",
         "Active filters:",
-        f"  reliability ≥ {f.min_reliability} (safety floor — non-negotiable) excluded by query (server-side)",
         f"  direct ports ≥ {config.DIRECT_PORT_COUNT_MIN} (safety floor — non-negotiable) excluded by query (server-side)",
     ]
     for n in _FILTER_ORDER:
         if n == "datacenter" and f.prosumer:
             continue
         c = counts.get(n, 0)
-        if n in _NON_NEGOTIABLE or n == "datacenter" or _user_chose(n, f) or c > 0:
-            lines.append(f"  {_label(n, f)}{_tag(n)} excluded {c}")
+        if n in _ALWAYS_SHOWN or _user_chose(n, f) or c > 0:
+            lines.append(f"  {_label(n, f)}{_tag(n, f)} excluded {c}")
 
     if counts.get("datacenter", 0) > 0 and not f.prosumer:
         lines += [
