@@ -126,11 +126,19 @@ def wait_for_ssh(host: str, port: int) -> bool:
 def attach_ssh_key(inst_id: int, ssh_pubkey: str) -> None:
     """`vastai attach ssh <id> <pubkey>`. Retry up to ATTACH_SSH_RETRIES on:
       - non-zero exit, OR
-      - stdout containing case-insensitive `'success': false`."""
+      - stdout containing case-insensitive `'success': false`.
+
+    "Already associated" responses are treated as success — the key is on the
+    instance, which is the post-condition we want. Vast.ai returns
+    `{'success': False, 'msg': 'SSH key already associated with instance.'}`
+    when the host pre-attaches the user's key during boot, and the message
+    never clears on retry."""
     last_out, last_err = "", ""
     for attempt in range(config.ATTACH_SSH_RETRIES):
         rc, out, err = vastai_cli.run_vastai(["attach", "ssh", str(inst_id), ssh_pubkey])
         last_out, last_err = out, err
+        if "already associated" in out.lower():
+            return
         failed = rc != 0 or "'success': false" in out.lower()
         if not failed:
             return

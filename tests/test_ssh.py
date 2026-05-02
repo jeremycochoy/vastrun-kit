@@ -359,3 +359,21 @@ def test_attach_ssh_key_retries_on_nonzero_exit(
 
     ssh.attach_ssh_key(123, "PUB")
     assert counter["n"] == 2
+
+
+def test_attach_ssh_key_already_associated_is_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Vast.ai returns `success: False` with msg `SSH key already associated
+    with instance.` when the host pre-attaches the user's key. The key IS
+    on the instance; we treat this as success — no retry, no raise."""
+    calls: list[list[str]] = []
+
+    def fake(args: list[str], **kw: object) -> tuple[int, str, str]:
+        calls.append(args)
+        return 0, "{'success': False, 'msg': 'SSH key already associated with instance.'}", ""
+
+    monkeypatch.setattr(ssh.vastai_cli, "run_vastai", fake)
+    monkeypatch.setattr(ssh.time, "sleep", lambda _s: None)
+    ssh.attach_ssh_key(123, "PUB")
+    assert len(calls) == 1  # no retry

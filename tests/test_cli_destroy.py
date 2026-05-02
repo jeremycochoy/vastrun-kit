@@ -252,7 +252,7 @@ def test_marker_matches_destroys_and_reports(
     result = runner.invoke(destroy_cli.app, ["12345", "training-v1"])
     assert result.exit_code == 0
     # Destroy invoked exactly once with the right argv
-    assert seen["destroy_argv"] == [["destroy", "instance", "12345"]]
+    assert seen["destroy_argv"] == [["destroy", "instance", "12345", "-y"]]
     # Verification ran for this id
     assert seen["verify"] == [12345]
     # Summary in stdout names the id
@@ -271,7 +271,7 @@ def test_marker_matches_unverified_warning_exits_1(
     combined = result.stdout + (result.stderr or "")
     assert "WARNING" in combined
     assert "12345" in combined
-    assert seen["destroy_argv"] == [["destroy", "instance", "12345"]]
+    assert seen["destroy_argv"] == [["destroy", "instance", "12345", "-y"]]
 
 
 # ----- single ID + --force (no label) ---------------------------------- #
@@ -286,7 +286,7 @@ def test_force_skips_marker_check_and_destroys(
     # No SSH / marker reads
     assert seen["read_marker"] == []
     # Destroy invoked
-    assert seen["destroy_argv"] == [["destroy", "instance", "12345"]]
+    assert seen["destroy_argv"] == [["destroy", "instance", "12345", "-y"]]
     assert "Destroyed instance 12345" in result.stdout
 
 
@@ -298,7 +298,7 @@ def test_force_with_unknown_id_still_works(
     seen = _patch_common(monkeypatch, snap=None, verify=True)
     result = runner.invoke(destroy_cli.app, ["12345", "--force"])
     assert result.exit_code == 0
-    assert seen["destroy_argv"] == [["destroy", "instance", "12345"]]
+    assert seen["destroy_argv"] == [["destroy", "instance", "12345", "-y"]]
 
 
 def test_force_with_label_still_skips_marker_check(
@@ -313,7 +313,7 @@ def test_force_with_label_still_skips_marker_check(
     assert result.exit_code == 0
     # No marker call
     assert seen["read_marker"] == []
-    assert seen["destroy_argv"] == [["destroy", "instance", "12345"]]
+    assert seen["destroy_argv"] == [["destroy", "instance", "12345", "-y"]]
 
 
 # ----- --all without --force ------------------------------------------- #
@@ -365,8 +365,8 @@ def test_all_force_destroys_each_and_exits_0_if_all_verified(
     assert result.exit_code == 0
     # Each instance destroyed
     assert seen["destroy_argv"] == [
-        ["destroy", "instance", "1"],
-        ["destroy", "instance", "2"],
+        ["destroy", "instance", "1", "-y"],
+        ["destroy", "instance", "2", "-y"],
     ]
     assert seen["verify_ids"] == [1, 2]
     # Each row's heads-up line shows up
