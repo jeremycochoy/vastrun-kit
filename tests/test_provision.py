@@ -59,6 +59,37 @@ def test_resolve_offer_empty_payload_raises(monkeypatch: pytest.MonkeyPatch) -> 
         provision.resolve_offer(123)
 
 
+def test_resolve_offer_default_query_is_datacenter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No silent prosumer fallback: the default query carries datacenter=True."""
+    seen: list[list[str]] = []
+
+    def fake(args, **kw):  # noqa: ANN001
+        seen.append(args)
+        return []
+
+    monkeypatch.setattr(provision.vastai_cli, "run_vastai_raw", fake)
+    with pytest.raises(errors.OfferUnavailableError):
+        provision.resolve_offer(123)
+    # Exactly one call (no fallback to prosumer); query contains datacenter=True.
+    assert len(seen) == 1
+    assert any("datacenter=True" in a for a in seen[0])
+
+
+def test_resolve_offer_prosumer_drops_datacenter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Explicit `prosumer=True` queries non-datacenter offers (the user opted in)."""
+    seen: list[list[str]] = []
+
+    def fake(args, **kw):  # noqa: ANN001
+        seen.append(args)
+        return [{"id": 555, "gpu_name": "RTX 4090"}]
+
+    monkeypatch.setattr(provision.vastai_cli, "run_vastai_raw", fake)
+    out = provision.resolve_offer(555, prosumer=True)
+    assert out == {"id": 555, "gpu_name": "RTX 4090"}
+    # No datacenter clause in the query when prosumer is on.
+    assert not any("datacenter=True" in a for a in seen[0])
+
+
 # ---------- resolve_image ----------
 
 def test_resolve_image_override_returned() -> None:

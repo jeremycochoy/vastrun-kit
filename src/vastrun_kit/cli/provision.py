@@ -60,6 +60,10 @@ def main(
     spot: bool = typer.Option(False, "--spot", help="Bid as interruptible (min_bid * BID_MULTIPLIER, capped)."),
     image: str = typer.Option(None, "--image", help="Docker image override (must contain ':')."),
     ssh_key: str = typer.Option(None, "--ssh-key", help="Local SSH public key path."),
+    prosumer: bool = typer.Option(
+        False, "--prosumer",
+        help="Allow non-datacenter offers. Match the flag you passed to vastrun-search.",
+    ),
 ) -> None:
     """Provision a fresh GPU instance from OFFER_ID."""
     try:
@@ -67,7 +71,7 @@ def main(
     except FileNotFoundError as e:
         _exit1(str(e))
     try:
-        offer = provision.resolve_offer(offer_id)
+        offer = provision.resolve_offer(offer_id, prosumer=prosumer)
     except errors.OfferUnavailableError as e:
         msg = str(e)
         if "vastrun-search" not in msg:
