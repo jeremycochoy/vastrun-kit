@@ -21,7 +21,7 @@ def _row(**over) -> dict:
         "id": 1,
         "gpu_name": "RTX 4090",
         "num_gpus": 1,
-        "gpu_ram": 24576,           # MB total across all GPUs
+        "gpu_ram": 24576,           # MB per GPU (Vast.ai gpu_ram is per-GPU)
         "total_flops": 100.0,        # TFLOPS across all GPUs
         "dph_total": 0.40,
         "min_bid": 0.30,
@@ -213,7 +213,7 @@ def test_filter_rejects_per_gpu_tflops_below_floor():
 
 
 def test_filter_rejects_per_gpu_vram_below_min():
-    # 16 GB total, 2 GPUs => 8 GB / GPU
+    # gpu_ram is per-GPU (16 GB/GPU here); below the 24 GB/GPU floor.
     rows = [_row(num_gpus=2, gpu_ram=16384)]
     f = OfferFilters(num_gpus=2, min_vram_gb=24)
     survivors, log = filter_offers(rows, f)
@@ -227,6 +227,22 @@ def test_filter_passes_per_gpu_vram_at_or_above_min():
     f = OfferFilters(num_gpus=1, min_vram_gb=24)
     survivors, _ = filter_offers(rows, f)
     assert len(survivors) == 1
+
+
+def test_filter_keeps_multi_gpu_offer_when_per_gpu_vram_meets_floor():
+    # Regression for issue #22 (Bug 1): the Vast.ai API `gpu_ram` field is
+    # ALREADY per-GPU VRAM in MB, not a total across GPUs. A 2-GPU offer
+    # with 16 GB per GPU must clear a 12 GB per-GPU floor. The old code
+    # divided the already-per-GPU value by num_gpus (16384/1024/2 = 8),
+    # wrongly excluding it — which truncated the table to only the few
+    # cards with enough VRAM to survive the spurious double division.
+    # total_flops bumped so the per-GPU TFLOPS floor doesn't mask the VRAM
+    # behaviour under test (200/2 = 100 TFLOPS/GPU clears the 80 floor).
+    rows = [_row(num_gpus=2, gpu_ram=16384, total_flops=200.0)]   # 16 GB / GPU
+    f = OfferFilters(num_gpus=2, min_vram_gb=12)
+    survivors, log = filter_offers(rows, f)
+    assert len(survivors) == 1
+    assert dict(log)["min_vram_gb"] == 0
 
 
 def test_filter_rejects_gpu_name_mismatch():
