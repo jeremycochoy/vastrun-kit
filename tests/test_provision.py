@@ -267,3 +267,38 @@ def test_compute_spot_bid_caps_at_default_max_bid() -> None:
 
 def test_compute_spot_bid_zero_min_bid_returns_zero() -> None:
     assert provision.compute_spot_bid({"min_bid": 0.0}) == 0.0
+
+
+# ---------- hardware_summary ----------
+
+def test_hardware_summary_shows_per_gpu_vram_not_partition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Vast.ai's `gpu_ram` field is already per-GPU VRAM in MB (the all-GPU
+    total is the separate `gpu_total_ram` field — confirmed against
+    vast-python's own glossary in #22 / PR #23). Dividing by `num_gpus`
+    understates per-GPU VRAM by a factor of `num_gpus`: a 2× RTX 4090
+    instance reported `12GB` instead of `24GB`. Regression test for #24.
+
+    `total_flops` IS a genuine all-GPU total, so `total_flops / num_gpus`
+    is correct and must be left alone — that's also asserted here so a
+    future "fix" doesn't drop the wrong divisor."""
+    inst = {
+        "id": 555,
+        "num_gpus": 2,
+        "gpu_name": "RTX 4090",
+        "gpu_ram": 24576,          # MB per GPU (confirmed: gpu_ram is per-GPU)
+        "total_flops": 165.0,       # genuine all-GPU total
+        "geolocation": "United States, US",
+    }
+    monkeypatch.setattr(provision.instances, "find_instance", lambda iid: inst)
+    summary = provision.hardware_summary(555)
+    assert summary is not None
+    # Per-GPU VRAM is the full 24GB, not 24576/2/1024 = 12GB.
+    assert "24GB" in summary
+    assert "12GB" not in summary
+    # Surrounding fields still render correctly.
+    assert "2x RTX 4090" in summary
+    # total_flops / num_gpus = 165.0 / 2 = 82.5 — correctly per-GPU.
+    assert "82.5 TFLOPS/GPU" in summary
+    assert "United States, US" in summary

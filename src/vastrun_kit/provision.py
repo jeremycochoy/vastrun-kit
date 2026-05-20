@@ -67,7 +67,9 @@ def hardware_summary(inst_id: int) -> str | None:
         return None
     n = max(1, int(inst.get("num_gpus") or 1))
     g, v, t, loc = (inst.get(k) for k in ("gpu_name", "gpu_ram", "total_flops", "geolocation"))
-    parts = [s for s in (f"{n}x {g}" if g else None, f"{int(v / n / 1024)}GB" if v else None,
+    # `gpu_ram` is per-GPU VRAM in MB (the all-GPU total is `gpu_total_ram`);
+    # `total_flops` IS a genuine all-GPU total, hence `/ n`. See #22 / PR #23.
+    parts = [s for s in (f"{n}x {g}" if g else None, f"{int(v / 1024)}GB" if v else None,
                          f"{t / n:.1f} TFLOPS/GPU" if t else None, loc or None) if s]
     return " · ".join(parts) if parts else None
 
