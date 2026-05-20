@@ -10,7 +10,6 @@ The tool should be so well-designed that agents (and humans) fall into the right
 - **TDD, strict.** Red → green → refactor. Write a failing test first, implement until it passes, then clean up. Every PR carries tests for the behaviour it changes.
 - **One PR per concern.** Keep PRs focused on a single issue. Bundle related cleanup with the change that motivates it; otherwise split.
 - **Worktrees, not the main checkout.** Other agents may be using the main tree concurrently. Always `git worktree add /tmp/vastrun-kit-<feature> -b feat/<name>` and remove the worktree when done.
-- **Post-merge.** After closing an issue, review the merged code and open at least one follow-up issue for anything worth tracking.
 
 ## Agent attribution
 
