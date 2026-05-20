@@ -561,7 +561,7 @@ Server-side query is best-effort. Apply these post-filters to the JSON response 
 - Country isn't in the resolved region set (when `region` is set).
 - `inet_up` / `inet_down` below per-filter floors.
 - Per-GPU TFLOPS (`total_flops / num_gpus`) below the per-GPU floor.
-- Per-GPU VRAM below `min_vram_gb`.
+- Per-GPU VRAM below `min_vram_gb`. The API's `gpu_ram` is already per-GPU (MB); compare it directly — do **not** divide by `num_gpus` (the all-GPU total is the separate `gpu_total_ram` field).
 - `gpu_name` doesn't match any user pattern (substring OR-match, case-insensitive, underscore↔space).
 
 Sort survivors by `(-dlperf_per_dphtotal, min_bid)` — best DLPerf-per-dollar first, with `min_bid` as a tiebreaker. `vastrun-search` prints up to `--limit` rows in that order; the agent sees the highest-value offers at the top.

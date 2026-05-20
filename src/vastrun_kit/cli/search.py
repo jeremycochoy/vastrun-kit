@@ -44,7 +44,7 @@ def _build_row(row: dict, *, spot: bool, hardware: bool) -> tuple[str, ...]:
         str(row.get("machine_id") or row.get("host_id") or "-"),
         str(row.get("gpu_name") or "-"),
         str(n),
-        f"{_f(row, 'gpu_ram') / n / 1024:.0f}GB",
+        f"{_f(row, 'gpu_ram') / 1024:.0f}GB",  # gpu_ram is per-GPU (not / n)
         f"{_f(row, 'total_flops') / n:.1f}",
         f"${_f(row, 'min_bid' if spot else 'dph_total'):.4f}",
         f"{float(dlperf):.1f}" if dlperf else "-",
@@ -154,4 +154,4 @@ def main(
     headers = _DEFAULT_HEADERS + (_HARDWARE_HEADERS if hardware else ())
     body = [_build_row(r, spot=spot, hardware=hardware) for r in survivors]
     typer.echo(_table.render_table(headers, body))
-    typer.echo(f"Total: {total} offers (showing top {min(total, limit)}).")
+    typer.echo(f"Total: {total} offers (showing top {len(survivors)}).")

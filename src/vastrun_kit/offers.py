@@ -111,7 +111,9 @@ def _excluded_by(row: dict, f: OfferFilters, region_set: set[str] | None) -> str
     n = max(1, int(row.get("num_gpus") or 1))
     if (row.get("total_flops") or 0) / n < tpg:
         return "min_tflops"
-    if f.min_vram_gb is not None and (row.get("gpu_ram") or 0) / 1024 / n < f.min_vram_gb:
+    # Vast.ai `gpu_ram` is already per-GPU VRAM in MB (the all-GPU total is a
+    # separate field, `gpu_total_ram`) — compare it directly, do NOT / n.
+    if f.min_vram_gb is not None and (row.get("gpu_ram") or 0) / 1024 < f.min_vram_gb:
         return "min_vram_gb"
     if f.gpu_name:
         h = row.get("gpu_name", "").lower().replace("_", " ")

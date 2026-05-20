@@ -32,7 +32,7 @@ def _offer(**overrides: object) -> dict:
         "host_id": 9001,
         "gpu_name": "RTX 4090",
         "num_gpus": 1,
-        "gpu_ram": 24576,           # MB total
+        "gpu_ram": 24576,           # MB per GPU (Vast.ai gpu_ram is per-GPU)
         "total_flops": 100.0,
         "dph_total": 0.50,
         "min_bid": 0.20,
@@ -223,6 +223,48 @@ def test_limit_caps_body_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     # Footer says 3 total but showing 1.
     assert "Total: 3 offers" in out
     assert "showing top 1" in out
+
+
+# ----- issue #22: gpu_ram is per-GPU, footer reflects rendered rows ------- #
+
+
+def test_vram_column_shows_per_gpu_not_partition(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bug 2: a 2-GPU RTX 4060 Ti 16GB offer (gpu_ram=16384, already per-GPU)
+    must render `16GB` in VRAM/GPU — not `8GB` (old code divided by num_gpus)."""
+    _stub_no_toml(monkeypatch)
+    rows = [_offer(id=4100, gpu_name="RTX 4060 Ti", num_gpus=2,
+                   gpu_ram=16384, total_flops=200.0)]
+    monkeypatch.setattr(vastai_cli, "run_vastai_raw", lambda *_a, **_kw: rows)
+
+    result = runner.invoke(search_cli.app, [])
+    assert result.exit_code == 0, result.stdout + (result.stderr or "")
+    assert "16GB" in result.stdout
+    assert "8GB" not in result.stdout
+
+
+def test_footer_showing_count_reflects_rendered_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Bug 1 symptom: the footer must report the number of rows actually
+    rendered, not the raw API count. One of three offers is dropped by a
+    client-side safety filter (bad driver), so the body has 2 rows and the
+    footer must say `showing top 2`, not `showing top 3`."""
+    _stub_no_toml(monkeypatch)
+    rows = [
+        _offer(id=7001, dlperf_per_dphtotal=60.0),
+        _offer(id=7002, dlperf_per_dphtotal=50.0),
+        _offer(id=7003, dlperf_per_dphtotal=40.0, driver_version="540.00.00"),
+    ]
+    monkeypatch.setattr(vastai_cli, "run_vastai_raw", lambda *_a, **_kw: rows)
+
+    result = runner.invoke(search_cli.app, [])
+    assert result.exit_code == 0, result.stdout + (result.stderr or "")
+    assert "Total: 3 offers" in result.stdout
+    assert "showing top 2" in result.stdout
+    assert "showing top 3" not in result.stdout
+    assert "7003" not in result.stdout  # dropped by the driver floor
 
 
 # ----- no matches → diagnostic + exit 1 ----------------------------------- #
