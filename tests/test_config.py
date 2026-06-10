@@ -12,16 +12,22 @@ Covered:
 - both ship torch >= 2.9.1;
 - both are cu12.8+ builds — the first CUDA with Blackwell sm_120/sm_100
   kernels — so a Blackwell name missing from BLACKWELL_GPU_PREFIXES still
-  falls through to a default image that works on it.
+  falls through to a default image that works on it;
+- README.md, docs/SPEC.md and the `vastrun-init` template name the current
+  defaults — an image bump that forgets the docs fails here instead of
+  drifting.
 """
 
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 
 from vastrun_kit import config
+
+_REPO = Path(__file__).resolve().parent.parent
 
 _DEFAULT_IMAGES = (config.IMAGE, config.BLACKWELL_IMAGE)
 
@@ -52,3 +58,15 @@ def test_default_images_satisfy_training_torch_floor(image: str) -> None:
 @pytest.mark.parametrize("image", _DEFAULT_IMAGES)
 def test_default_images_cuda_has_blackwell_kernels(image: str) -> None:
     assert _cuda_version(image) >= (12, 8)
+
+
+@pytest.mark.parametrize("doc", ("README.md", "docs/SPEC.md"))
+@pytest.mark.parametrize("image", _DEFAULT_IMAGES)
+def test_docs_name_the_current_default_images(doc: str, image: str) -> None:
+    assert image in (_REPO / doc).read_text(), f"{doc} does not mention {image}"
+
+
+def test_init_template_names_the_current_default_image() -> None:
+    from vastrun_kit.cli import init
+
+    assert config.IMAGE in init._TEMPLATE
