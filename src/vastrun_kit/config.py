@@ -27,8 +27,8 @@ DIRECT_PORT_COUNT_MIN = 1
 DRIVER_VERSION_MIN = "550.0.0"
 CUDA_VERSION_MIN = 12.4
 
-IMAGE = "nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04"
-BLACKWELL_IMAGE = "nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04"
+IMAGE = "pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime"
+BLACKWELL_IMAGE = "pytorch/pytorch:2.9.1-cuda13.0-cudnn9-runtime"
 BLACKWELL_GPU_PREFIXES = ("RTX 50", "RTX PRO 5", "RTX PRO 6", "B200", "B100", "GB200")
 
 SSH_PUBKEY_CANDIDATES = (

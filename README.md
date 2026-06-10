@@ -104,9 +104,9 @@ Per-project config in CWD. Required for `vastrun-provision`. Scaffold one with `
 
 ```toml
 [vast]
-image             = "your/image:tag"     # repo:tag form; default: nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+image             = "your/image:tag"     # repo:tag form; default: pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
                                          # Blackwell offers (RTX 50/PRO 5/PRO 6, B100/B200, GB200) auto-promote to
-                                         # nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04 when image is unset
+                                         # pytorch/pytorch:2.9.1-cuda13.0-cudnn9-runtime when image is unset
 min_vram_gb       = 24
 min_tflops        = 50.0
 max_bid           = 1.50
@@ -123,7 +123,7 @@ ssh_key           = "~/.ssh/id_ed25519.pub"
 
 `VASTAI_API_TOKEN` is read from process env, the package directory's `.env`, or your project's `.env`, in that order. Process env wins.
 
-**PyTorch pinning:** the default image is CUDA 12.8, so a bare `pip install torch` may pull a wheel for a different CUDA. Pin to cu128, or set `image = "pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime"`.
+**PyTorch:** the default images ship torch preinstalled (2.9.1, cu128 / cu130 matching the GPU), so `import torch` works out of the box, and `pip install -r requirements.txt` leaves torch untouched as long as the file's torch floor is ≤ 2.9.1. If you need a *different* torch, install it from the matching CUDA channel (e.g. `--index-url https://download.pytorch.org/whl/cu128`) — a bare `pip install torch==X` may pull a wheel for a different CUDA.
 
 ## Multi-agent safety
 
