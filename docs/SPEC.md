@@ -71,7 +71,7 @@ Field semantics:
 
 | Key | Type | Default | Meaning |
 |-----|------|---------|---------|
-| `vast.image` | str | package default `nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04` | Docker image for new instances. Must be `repo:tag` form. |
+| `vast.image` | str | package default `pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime` | Docker image for new instances. Must be `repo:tag` form. |
 | `vast.min_vram_gb` | int | unset → no filter | Per-GPU VRAM floor in GB. |
 | `vast.min_tflops` | float | unset → safety floor | Per-GPU TFLOPS floor. |
 | `vast.max_bid` | float | unset → safety cap | Max hourly price in $/h. |
@@ -119,8 +119,8 @@ These are used when neither `.vastrun.toml` nor a CLI flag overrides them:
 | `DIRECT_PORT_COUNT_MIN` | `1` | Direct ports floor — guarantees SSH gets one. |
 | `DRIVER_VERSION_MIN` | `"550.0.0"` | Hard NVIDIA driver floor. |
 | `CUDA_VERSION_MIN` | `12.4` | Hard CUDA toolkit floor. |
-| `IMAGE` | `"nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04"` | Default Docker image for non-Blackwell offers. |
-| `BLACKWELL_IMAGE` | `"nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04"` | Image auto-selected for Blackwell offers when `--image` / `vast.image` is unset. CUDA 13 has full sm_120 support. |
+| `IMAGE` | `"pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime"` | Default Docker image for non-Blackwell offers. Training-ready: torch 2.9.1 + pip preinstalled; cu12.8 also carries Blackwell sm_120/sm_100 kernels, so unlisted Blackwell names still get a working image. |
+| `BLACKWELL_IMAGE` | `"pytorch/pytorch:2.9.1-cuda13.0-cudnn9-runtime"` | Image auto-selected for Blackwell offers when `--image` / `vast.image` is unset. Same torch, CUDA 13 build (full sm_120 support, smaller pull). |
 | `BLACKWELL_GPU_PREFIXES` | `["RTX 50", "RTX PRO 5", "RTX PRO 6", "B200", "B100", "GB200"]` | Offers whose `gpu_name` starts with any of these are treated as Blackwell — `BLACKWELL_IMAGE` is auto-selected when no explicit image is set. |
 | `SSH_PUBKEY_CANDIDATES` | `~/.ssh/id_ed25519.pub`, `~/.ssh/id_rsa.pub`, `~/.ssh/id_ecdsa.pub` | Tried in order when no `--ssh-key`. |
 

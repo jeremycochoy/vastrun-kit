@@ -104,9 +104,9 @@ Per-project config in CWD. Required for `vastrun-provision`. Scaffold one with `
 
 ```toml
 [vast]
-image             = "your/image:tag"     # repo:tag form; default: nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+image             = "your/image:tag"     # repo:tag form; default: pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime
                                          # Blackwell offers (RTX 50/PRO 5/PRO 6, B100/B200, GB200) auto-promote to
-                                         # nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04 when image is unset
+                                         # pytorch/pytorch:2.9.1-cuda13.0-cudnn9-runtime when image is unset
 min_vram_gb       = 24
 min_tflops        = 50.0
 max_bid           = 1.50

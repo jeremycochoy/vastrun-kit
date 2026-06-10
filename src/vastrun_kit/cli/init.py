@@ -11,7 +11,7 @@ _TEMPLATE = """# .vastrun.toml — per-project Vast.ai config for vastrun-kit.
 # Stripping these `#` lines must yield valid TOML — keep that invariant.
 #
 # [vast]
-# image             = "nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04"
+# image             = "pytorch/pytorch:2.9.1-cuda12.8-cudnn9-runtime"
 # min_vram_gb       = 24
 # min_tflops        = 50.0
 # max_bid           = 1.50
