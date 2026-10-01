@@ -514,3 +514,11 @@ def test_half_set_registry_credentials_exit_1_before_create(
     assert "VASTRUN_REGISTRY_USERNAME" in combined
     assert FAKE_SECRET not in combined
     assert patch_flow["create_argv"] is None
+
+
+def test_help_names_the_registry_variables() -> None:
+    """rnd's vastrun/machine.py reads this help to check that the install passes the registry login."""
+    result = runner.invoke(provision_cli.app, ["--help"])
+    assert result.exit_code == 0
+    assert "VASTRUN_REGISTRY_USERNAME" in result.stdout
+    assert "VASTRUN_REGISTRY_TOKEN" in result.stdout

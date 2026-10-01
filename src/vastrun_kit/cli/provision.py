@@ -61,7 +61,10 @@ def main(
     image: str = typer.Option(None, "--image", help="Docker image override (must contain ':')."),
     ssh_key: str = typer.Option(None, "--ssh-key", help="Local SSH public key path."),
 ) -> None:
-    """Provision a fresh GPU instance from OFFER_ID."""
+    """Provision a fresh GPU instance from OFFER_ID.
+
+    For a private image, set VASTRUN_REGISTRY_USERNAME and VASTRUN_REGISTRY_TOKEN.
+    """
     try:
         vast = client_config.vast_section(client_config.load_vastrun_toml())
     except FileNotFoundError as e:
