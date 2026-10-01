@@ -76,10 +76,10 @@ def patch_flow(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, Any
     monkeypatch.setattr(provision_cli.provision, "resolve_offer", lambda oid: offer)
     monkeypatch.setattr(provision_cli.provision, "check_balance", lambda: 25.0)
 
-    def fake_create(offer_id, *, image, label, ssh_pubkey, spot_bid):
+    def fake_create(offer_id, *, image, label, ssh_pubkey, spot_bid, login=None):
         seen["create_argv"] = {
             "offer_id": offer_id, "image": image, "label": label,
-            "ssh_pubkey": ssh_pubkey, "spot_bid": spot_bid,
+            "ssh_pubkey": ssh_pubkey, "spot_bid": spot_bid, "login": login,
         }
         return 555
 
@@ -472,3 +472,45 @@ def test_hello_world_failure_does_not_exit_1(
     )
     assert result.exit_code == 0
     assert "Instance 555 ready" in result.stdout
+
+
+# ----- registry login (private images) ------------------------------------ #
+
+FAKE_SECRET = "dckr_pat_FAKE-secret-0000"
+
+
+def test_public_image_sends_no_login(patch_flow: dict[str, Any]) -> None:
+    result = runner.invoke(
+        provision_cli.app, ["8765432", "--label", "x", "--ssh-key", patch_flow["pub_path"]],
+    )
+    assert result.exit_code == 0, result.stdout + (result.stderr or "")
+    assert patch_flow["create_argv"]["login"] is None
+
+
+def test_registry_credentials_reach_create_and_stay_out_of_the_output(
+    monkeypatch: pytest.MonkeyPatch, patch_flow: dict[str, Any]
+) -> None:
+    monkeypatch.setenv("VASTRUN_REGISTRY_USERNAME", "jeremycochoy")
+    monkeypatch.setenv("VASTRUN_REGISTRY_TOKEN", FAKE_SECRET)
+    result = runner.invoke(
+        provision_cli.app,
+        ["8765432", "--label", "x", "--image", "jeremycochoy/rnd-train:abc",
+         "--ssh-key", patch_flow["pub_path"]],
+    )
+    assert result.exit_code == 0, result.stdout + (result.stderr or "")
+    assert patch_flow["create_argv"]["login"] == f"-u jeremycochoy -p {FAKE_SECRET} docker.io"
+    assert FAKE_SECRET not in result.stdout + (result.stderr or "")
+
+
+def test_half_set_registry_credentials_exit_1_before_create(
+    monkeypatch: pytest.MonkeyPatch, patch_flow: dict[str, Any]
+) -> None:
+    monkeypatch.setenv("VASTRUN_REGISTRY_TOKEN", FAKE_SECRET)
+    result = runner.invoke(
+        provision_cli.app, ["8765432", "--label", "x", "--ssh-key", patch_flow["pub_path"]],
+    )
+    assert result.exit_code == 1
+    combined = result.stdout + (result.stderr or "")
+    assert "VASTRUN_REGISTRY_USERNAME" in combined
+    assert FAKE_SECRET not in combined
+    assert patch_flow["create_argv"] is None

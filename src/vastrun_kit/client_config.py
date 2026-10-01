@@ -9,6 +9,8 @@ from pathlib import Path
 from . import errors
 
 PACKAGE_ENV = Path(__file__).resolve().parent.parent.parent / ".env"
+REGISTRY_USERNAME = "VASTRUN_REGISTRY_USERNAME"
+REGISTRY_TOKEN = "VASTRUN_REGISTRY_TOKEN"
 
 
 def _parse_dotenv(path: Path) -> dict[str, str]:
@@ -25,17 +27,38 @@ def _parse_dotenv(path: Path) -> dict[str, str]:
     return out
 
 
-def load_api_key() -> str:
-    """Process env > package .env > CWD .env. Raises MissingCredentialError if absent."""
-    if v := os.environ.get("VASTAI_API_TOKEN"):
+def _lookup(name: str) -> str | None:
+    """Process env > package .env > CWD .env. None when no source sets `name`."""
+    if v := os.environ.get(name):
         return v
     for path in (PACKAGE_ENV, Path.cwd() / ".env"):
-        if v := _parse_dotenv(path).get("VASTAI_API_TOKEN"):
+        if v := _parse_dotenv(path).get(name):
             return v
+    return None
+
+
+def load_api_key() -> str:
+    """Process env > package .env > CWD .env. Raises MissingCredentialError if absent."""
+    if v := _lookup("VASTAI_API_TOKEN"):
+        return v
     raise errors.MissingCredentialError(
         f"VASTAI_API_TOKEN not found. Set it in process env or write it to {PACKAGE_ENV} "
         "or to a .env in the current directory."
     )
+
+
+def load_registry_credentials() -> tuple[str, str] | None:
+    """(username, token) that pull a private image, from the same sources as the API key.
+    None when neither is set; MissingCredentialError when only one is set."""
+    username, token = _lookup(REGISTRY_USERNAME), _lookup(REGISTRY_TOKEN)
+    if not username and not token:
+        return None
+    if not (username and token):
+        missing = REGISTRY_USERNAME if token else REGISTRY_TOKEN
+        raise errors.MissingCredentialError(
+            f"{missing} not found. Set both {REGISTRY_USERNAME} and {REGISTRY_TOKEN}, or neither."
+        )
+    return username, token
 
 
 def load_vastrun_toml(path: Path | None = None) -> dict:

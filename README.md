@@ -123,6 +123,8 @@ ssh_key           = "~/.ssh/id_ed25519.pub"
 
 `VASTAI_API_TOKEN` is read from process env, the package directory's `.env`, or your project's `.env`, in that order. Process env wins.
 
+**Private images:** set `VASTRUN_REGISTRY_USERNAME` and `VASTRUN_REGISTRY_TOKEN` (same sources as `VASTAI_API_TOKEN`; never in `.vastrun.toml`). `vastrun-provision` then passes `--login "-u USER -p TOKEN REGISTRY"` to `vastai create instance`, so the host can pull the image. `REGISTRY` comes from the image name (`docker.io` when the name has no registry host). The rented host receives the token: give it a read-only token. Set both variables or neither.
+
 **PyTorch:** the default images ship torch preinstalled (2.9.1, cu128 / cu130 matching the GPU), so `import torch` works out of the box, and `pip install -r requirements.txt` leaves torch untouched as long as the file's torch floor is ≤ 2.9.1. If you need a *different* torch, install it from the matching CUDA channel (e.g. `--index-url https://download.pytorch.org/whl/cu128`) — a bare `pip install torch==X` may pull a wheel for a different CUDA.
 
 ## Multi-agent safety
@@ -142,7 +144,7 @@ vastrun-kit's threat model: multiple agents and humans running `vastrun-*` concu
 1. Load `.vastrun.toml` + credentials. Resolve the offer via `vastai search offers id=<OFFER_ID>`; if it's gone, exit 1 pointing at `vastrun-search`.
 2. Validate SSH key (read, strip, reject empty) and image format (must contain `:`). Resolve the effective image: Blackwell offer + no explicit image → `BLACKWELL_IMAGE`; otherwise default `IMAGE`.
 3. Refuse if account credit < $0.10.
-4. One `vastai create instance` call. Empty stdout (a known CLI bug where create may have succeeded silently) → exit 1 with a recovery message naming the offer ID. **No scan-and-recover** — that path has historically caused duplicate instances.
+4. One `vastai create instance` call, with `--login` when registry credentials are set. Empty stdout (a known CLI bug where create may have succeeded silently) → exit 1 with a recovery message naming the offer ID. **No scan-and-recover** — that path has historically caused duplicate instances.
 5. `wait_for_boot` (60 × 5s = 5 min). DOA (`error` substring in `status_msg`), outbid (`intended_status == stopped`), terminal state, or boot timeout → exit 1 with the instance ID and recovery commands.
 6. Sleep, attach SSH key (3× retry, 2s backoff), sleep, resolve SSH endpoint, `wait_for_ssh` (15 × 2s).
 7. Write `/tmp/vastrun_owner.json`. The marker MUST end up on disk — without it every destructive command refuses to act on the instance, so on write failure the error message names the explicit recovery command.

@@ -302,3 +302,40 @@ def test_hardware_summary_shows_per_gpu_vram_not_partition(
     # total_flops / num_gpus = 165.0 / 2 = 82.5 — correctly per-GPU.
     assert "82.5 TFLOPS/GPU" in summary
     assert "United States, US" in summary
+
+
+# ---------- registry login (private images) ----------
+
+def test_registry_server_defaults_to_docker_hub() -> None:
+    assert provision.registry_server("jeremycochoy/rnd-train:abc") == "docker.io"
+    assert provision.registry_server("pytorch/pytorch:2.9.1") == "docker.io"
+
+
+def test_registry_server_reads_the_registry_host() -> None:
+    assert provision.registry_server("ghcr.io/owner/image:tag") == "ghcr.io"
+    assert provision.registry_server("localhost:5000/image:tag") == "localhost:5000"
+
+
+def test_docker_login_none_without_credentials() -> None:
+    assert provision.docker_login("owner/image:tag", None) is None
+
+
+def test_docker_login_names_user_token_and_registry() -> None:
+    login = provision.docker_login("ghcr.io/owner/image:tag", ("bob", "fake-token"))
+    assert login == "-u bob -p fake-token ghcr.io"
+
+
+def test_create_instance_forwards_login(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = _capture_create(monkeypatch)
+    provision.create_instance(
+        100, image="owner/image:tag", label="x", ssh_pubkey="k", spot_bid=None,
+        login="-u bob -p fake-token docker.io",
+    )
+    argv = captured["argv"]
+    assert argv[argv.index("--login") + 1] == "-u bob -p fake-token docker.io"
+
+
+def test_create_instance_without_login_has_no_login_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured = _capture_create(monkeypatch)
+    provision.create_instance(100, image="i:t", label="x", ssh_pubkey="k", spot_bid=None)
+    assert "--login" not in captured["argv"]

@@ -78,6 +78,7 @@ def main(
     try:
         pub = ssh.autodiscover_ssh_pubkey(ssh_key or vast.get("ssh_key"))
         eff_image = provision.resolve_image(offer, override=image or vast.get("image"))
+        login = provision.docker_login(eff_image, client_config.load_registry_credentials())
         credit = provision.check_balance()
     except (FileNotFoundError, ValueError, errors.VastaiCliError, errors.MissingCredentialError) as e:
         _exit1(str(e))
@@ -87,7 +88,7 @@ def main(
     spot_bid = provision.compute_spot_bid(offer) if spot else None
     try:
         inst_id = provision.create_instance(
-            offer_id, image=eff_image, label=label, ssh_pubkey=pub, spot_bid=spot_bid,
+            offer_id, image=eff_image, label=label, ssh_pubkey=pub, spot_bid=spot_bid, login=login,
         )
     except (errors.VastaiCliError, errors.MissingCredentialError) as e:
         _exit1(str(e))

@@ -62,3 +62,41 @@ def test_run_vastai_timeout_raises(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(vastai_cli.subprocess, "run", boom)
     with pytest.raises(errors.VastaiCliError, match="timed out"):
         vastai_cli.run_vastai(["show", "user"])
+
+
+# ---------- registry login (private images) ----------
+
+FAKE_SECRET = "dckr_pat_FAKE-secret-0000"
+
+
+def test_create_instance_command_carries_the_registry_login(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Credentials from the environment reach `vastai create instance --login`, and only there."""
+    from vastrun_kit import client_config, provision
+
+    monkeypatch.setenv(client_config.REGISTRY_USERNAME, "jeremycochoy")
+    monkeypatch.setenv(client_config.REGISTRY_TOKEN, FAKE_SECRET)
+    seen = _patch_run(monkeypatch, FakeProc(0, '{"success": true, "new_contract": 555}'))
+    image = "jeremycochoy/rnd-train:abc123"
+    login = provision.docker_login(image, client_config.load_registry_credentials())
+    inst_id = provision.create_instance(
+        8765432, image=image, label="train-1", ssh_pubkey="ssh-ed25519 AAA", spot_bid=None, login=login,
+    )
+    assert inst_id == 555
+    assert seen == [[
+        "vastai", "--api-key", "test-token-123",
+        "create", "instance", "8765432", "--ssh", "--direct", "--disk", "60",
+        "--label", "train-1", "--image", image,
+        "--login", f"-u jeremycochoy -p {FAKE_SECRET} docker.io",
+    ]]
+
+
+def test_run_vastai_timeout_message_hides_the_login(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(cmd, capture_output, text, timeout):  # noqa: ANN001
+        raise subprocess.TimeoutExpired(cmd, timeout)
+
+    monkeypatch.setattr(vastai_cli.subprocess, "run", boom)
+    with pytest.raises(errors.VastaiCliError) as exc:
+        vastai_cli.run_vastai(["create", "instance", "1", "--login", f"-u bob -p {FAKE_SECRET} docker.io"])
+    assert FAKE_SECRET not in str(exc.value)
+    # The chained TimeoutExpired holds the full command, with the API key and the login.
+    assert exc.value.__cause__ is None and exc.value.__suppress_context__
