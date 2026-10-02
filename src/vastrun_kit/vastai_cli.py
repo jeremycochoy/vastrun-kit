@@ -14,6 +14,13 @@ from typing import Any
 
 from . import client_config, config, errors
 
+_SECRET_FLAGS = ("--login",)
+
+
+def redact(args: list[str]) -> list[str]:
+    """`args` with the value after each secret flag replaced by `***`, for messages."""
+    return ["***" if i and args[i - 1] in _SECRET_FLAGS else a for i, a in enumerate(args)]
+
 
 def run_vastai(
     args: list[str],
@@ -23,10 +30,11 @@ def run_vastai(
     cmd = ["vastai", "--api-key", client_config.load_api_key(), *args]
     try:
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    except subprocess.TimeoutExpired as e:
+    except subprocess.TimeoutExpired:
+        # `from None`: the TimeoutExpired holds the full command, with the API key and any login.
         raise errors.VastaiCliError(
-            f"`vastai {' '.join(args)}` timed out after {timeout}s"
-        ) from e
+            f"`vastai {' '.join(redact(args))}` timed out after {timeout}s"
+        ) from None
     return p.returncode, p.stdout, p.stderr
 
 
@@ -41,7 +49,7 @@ def run_vastai_raw(
     rather than silently returning None / re-querying.
     """
     rc, out, err = run_vastai([*args, "--raw"], timeout=timeout)
-    pretty = " ".join(args)
+    pretty = " ".join(redact(args))
     if rc != 0:
         msg = (err.strip() or out.strip() or "non-zero exit").splitlines()[0]
         raise errors.VastaiCliError(f"`vastai {pretty}` failed: {msg}")

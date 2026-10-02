@@ -47,6 +47,22 @@ def resolve_image(offer: dict, *, override: str | None) -> str:
     return config.BLACKWELL_IMAGE if blackwell else config.IMAGE
 
 
+def registry_server(image: str) -> str:
+    """Registry host of an image reference: `ghcr.io/o/i:t` → `ghcr.io`, `o/i:t` → `docker.io`."""
+    first, slash, _ = image.partition("/")
+    if slash and ("." in first or ":" in first or first == "localhost"):
+        return first
+    return "docker.io"
+
+
+def docker_login(image: str, credentials: tuple[str, str] | None) -> str | None:
+    """`--login` value of `vastai create instance` for `image`. None without credentials."""
+    if credentials is None:
+        return None
+    username, token = credentials
+    return f"-u {username} -p {token} {registry_server(image)}"
+
+
 def check_balance() -> float:
     """`vastai show user --raw` → float credit."""
     return float(vastai_cli.run_vastai_raw(["show", "user"]).get("credit") or 0)
@@ -76,12 +92,16 @@ def hardware_summary(inst_id: int) -> str | None:
 
 def create_instance(
     offer_id: int, *, image: str, label: str, ssh_pubkey: str, spot_bid: float | None,
+    login: str | None = None,
 ) -> int:
-    """One `vastai create instance` call → new instance id. Empty stdout / no id → VastaiCliError."""
+    """One `vastai create instance` call → new instance id. Empty stdout / no id → VastaiCliError.
+    `login` (see `docker_login`) lets the host pull a private image."""
     argv = ["create", "instance", str(offer_id), "--ssh", "--direct",
             "--disk", str(config.DISK_GB), "--label", label, "--image", image]
     if spot_bid is not None:
         argv += ["--bid_price", f"{spot_bid:.2f}"]
+    if login:
+        argv += ["--login", login]
     rc, out, err = vastai_cli.run_vastai(argv)
     pretty = f"`vastai create instance {offer_id}`"
     if not out.strip():

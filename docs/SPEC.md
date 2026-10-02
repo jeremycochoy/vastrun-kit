@@ -91,6 +91,8 @@ When `.vastrun.toml` is missing, the `client_config` loader raises `FileNotFound
 
 Read in priority order: process environment, then the package directory's `.env`, then the client project's `.env`. Process env wins. `VASTAI_API_TOKEN` is required; if missing from all sources, the loader raises `MissingCredentialError` naming the package `.env` path.
 
+`VASTRUN_REGISTRY_USERNAME` and `VASTRUN_REGISTRY_TOKEN` are optional and come from the same sources. They pull a private image. Set both or neither; one alone raises `MissingCredentialError` naming the other. Never store them in `.vastrun.toml`.
+
 ### Package defaults (`config`)
 
 These are used when neither `.vastrun.toml` nor a CLI flag overrides them:
@@ -144,7 +146,7 @@ Internal flow executed by `vastrun-provision <OFFER_ID>` — stated once here so
 2. Resolve the offer (`vastai search offers id=<OFFER_ID>`). If missing or no longer available, exit 1 with a message naming the offer ID and pointing at `vastrun-search`.
 3. Validate SSH key (read, strip, reject empty). Validate image format (must contain `:`). Resolve the effective image: if `--image` / `vast.image` is unset and the offer's `gpu_name` matches `BLACKWELL_GPU_PREFIXES`, use `BLACKWELL_IMAGE`; otherwise `IMAGE`.
 4. Check balance. If < $0.10, exit 1 pointing at the billing page.
-5. Issue one `vastai create instance` call. On empty stdout (Vast.ai CLI quirk where the create may have succeeded silently), exit 1 with a message directing the user at `vastrun-status` and `vastrun-destroy <id> --force`. **Do not** scan-and-recover — that path has caused duplicate instances. If create errors with a non-empty message, surface it and exit 1.
+5. Issue one `vastai create instance` call. With registry credentials set, add `--login "-u USER -p TOKEN REGISTRY"`, where `REGISTRY` is the host part of the image name (`docker.io` when the name has none). On empty stdout (Vast.ai CLI quirk where the create may have succeeded silently), exit 1 with a message directing the user at `vastrun-status` and `vastrun-destroy <id> --force`. **Do not** scan-and-recover — that path has caused duplicate instances. If create errors with a non-empty message, surface it and exit 1.
 6. `wait_for_boot` (60 × 5s = 5 min). On timeout / DOA / preemption, exit 1 with a message naming the instance ID, `vastrun-status`, and `vastrun-destroy`.
 7. Sleep `POST_BOOT_GRACE_SECONDS`. Attach SSH key (3 retries, 2s backoff). Sleep `POST_ATTACH_KEY_GRACE_SECONDS`. Resolve SSH endpoint. `wait_for_ssh` (15 × 2s).
 8. Write the on-instance ownership marker. If the write fails, exit 1 naming the instance ID and pointing at `vastrun-destroy`. The marker must end up on disk — there is no best-effort fallback. The marker is an ownership tag, not a reuse key.

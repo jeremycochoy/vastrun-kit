@@ -38,3 +38,35 @@ def test_load_vastrun_toml_parses(tmp_path: Path) -> None:
     p.write_text('[vast]\nmin_vram_gb = 24\ngpu_name = ["A100", "H100"]\n')
     data = client_config.load_vastrun_toml(p)
     assert client_config.vast_section(data) == {"min_vram_gb": 24, "gpu_name": ["A100", "H100"]}
+
+
+# ---------- registry credentials (private images) ----------
+
+FAKE_SECRET = "dckr_pat_FAKE-secret-0000"
+
+
+def test_load_registry_credentials_none_when_unset() -> None:
+    assert client_config.load_registry_credentials() is None
+
+
+def test_load_registry_credentials_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(client_config.REGISTRY_USERNAME, "bob")
+    monkeypatch.setenv(client_config.REGISTRY_TOKEN, FAKE_SECRET)
+    assert client_config.load_registry_credentials() == ("bob", FAKE_SECRET)
+
+
+def test_load_registry_credentials_from_cwd_dotenv(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text(
+        f'VASTRUN_REGISTRY_USERNAME=bob\nVASTRUN_REGISTRY_TOKEN="{FAKE_SECRET}"\n'
+    )
+    assert client_config.load_registry_credentials() == ("bob", FAKE_SECRET)
+
+
+def test_load_registry_credentials_half_set_raises_without_the_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(client_config.REGISTRY_TOKEN, FAKE_SECRET)
+    with pytest.raises(errors.MissingCredentialError) as exc:
+        client_config.load_registry_credentials()
+    assert client_config.REGISTRY_USERNAME in str(exc.value)
+    assert FAKE_SECRET not in str(exc.value)
