@@ -103,6 +103,7 @@ def patch_flow(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, Any
         return True
 
     monkeypatch.setattr(provision_cli.ssh, "wait_for_ssh", fake_wait_ssh)
+    monkeypatch.setattr(provision_cli.ssh, "fallback_endpoint", lambda iid, used: None)
 
     def fake_ssh_exec(host, port, cmd, **kw):
         seen["ssh_exec"].append({"host": host, "port": port, "cmd": cmd})
@@ -379,6 +380,37 @@ def test_wait_for_ssh_false_exits_1(
     assert "SSH unreachable" in combined
     assert "ssh5.vast.ai:22000" in combined
     assert "vastrun-destroy 555 --force" in combined
+
+
+def test_proxy_unreachable_continues_on_the_direct_port(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, patch_flow: dict[str, Any]
+) -> None:
+    """Vast.ai's SSH proxy can refuse every connection while the direct port answers."""
+    monkeypatch.setattr(provision_cli.ssh, "wait_for_ssh", lambda h, p: (h, p) == ("1.2.3.4", 40022))
+    monkeypatch.setattr(provision_cli.ssh, "fallback_endpoint", lambda iid, used: ("1.2.3.4", 40022))
+    result = runner.invoke(
+        provision_cli.app,
+        ["8765432", "--label", "x", "--ssh-key", patch_flow["pub_path"]],
+    )
+    assert result.exit_code == 0
+    assert patch_flow["marker_writes"] == [{"host": "1.2.3.4", "port": 40022, "label": "x"}]
+    assert "ssh -p 40022 root@1.2.3.4" in result.stdout
+
+
+def test_proxy_and_direct_port_unreachable_exits_1(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, patch_flow: dict[str, Any]
+) -> None:
+    monkeypatch.setattr(provision_cli.ssh, "wait_for_ssh", lambda h, p: False)
+    monkeypatch.setattr(provision_cli.ssh, "fallback_endpoint", lambda iid, used: ("1.2.3.4", 40022))
+    result = runner.invoke(
+        provision_cli.app,
+        ["8765432", "--label", "x", "--ssh-key", patch_flow["pub_path"]],
+    )
+    assert result.exit_code == 1
+    combined = result.stdout + (result.stderr or "")
+    assert "SSH unreachable at ssh5.vast.ai:22000, 1.2.3.4:40022" in combined
+    assert "vastrun-destroy 555 --force" in combined
+    assert patch_flow["marker_writes"] == []
 
 
 # ----- step-11: marker write failure -------------------------------------- #

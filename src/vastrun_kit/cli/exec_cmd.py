@@ -1,7 +1,8 @@
 """`vastrun-exec` — run a one-off command on an instance, streaming output.
 
 The command is wrapped in base64 by `ssh.ssh_exec`; we delegate transport,
-retry SSH transport failures (rc==255) once after a 3s sleep, and propagate
+retry SSH transport failures (rc==255) once after a 3s sleep, then once on the
+direct port (the Vast.ai proxy can refuse every connection), and propagate
 the user's command exit code. After the run we attempt a best-effort
 "spent so far" footer on stderr — silent on any failure so a flaky API
 never overrides the command's own exit code.
@@ -62,6 +63,10 @@ def main(instance_id: int, command: str) -> None:
     if rc == _SSH_TRANSPORT_RC:
         time.sleep(_SSH_RETRY_SLEEP_SECONDS)
         rc, _, _ = ssh.ssh_exec(host, port, command, stream=True)
+    if rc == _SSH_TRANSPORT_RC:
+        direct = ssh.fallback_endpoint(instance_id, endpoint)
+        if direct is not None:
+            rc, _, _ = ssh.ssh_exec(*direct, command, stream=True)
 
     _print_spent_footer(instance_id)
     raise typer.Exit(code=rc)

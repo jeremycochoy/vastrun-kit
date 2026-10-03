@@ -28,9 +28,14 @@ def _patch_ssh(
     endpoint: tuple[str, int] | None = ("h.example", 22),
     rcs: list[int] | None = None,
     find: object = "unset",
+    direct: tuple[str, int] | None = None,
 ) -> dict[str, list]:
     """Stub ssh / instances / time.sleep. Returns a dict capturing call args."""
-    seen: dict[str, list] = {"exec": [], "endpoint": [], "sleep": [], "find": []}
+    seen: dict[str, list] = {"exec": [], "endpoint": [], "sleep": [], "find": [], "fallback": []}
+
+    def fake_fallback(inst_id: int, used: tuple[str, int]):
+        seen["fallback"].append((inst_id, used))
+        return direct
 
     def fake_resolve(inst_id: int):
         seen["endpoint"].append(inst_id)
@@ -59,6 +64,7 @@ def _patch_ssh(
         return find
 
     monkeypatch.setattr(exec_cmd.ssh, "resolve_ssh_endpoint", fake_resolve)
+    monkeypatch.setattr(exec_cmd.ssh, "fallback_endpoint", fake_fallback)
     monkeypatch.setattr(exec_cmd.ssh, "ssh_exec", fake_exec)
     monkeypatch.setattr(exec_cmd.time, "sleep", fake_sleep)
     monkeypatch.setattr(exec_cmd.instances, "find_instance", fake_find)
@@ -110,6 +116,27 @@ def test_ssh_255_twice_propagates(monkeypatch: pytest.MonkeyPatch) -> None:
     result = runner.invoke(exec_cmd.app, ["12345", "nvidia-smi"])
     assert result.exit_code == 255
     assert len(seen["exec"]) == 2
+
+
+# ---------- proxy refuses → the direct port ------------------------------ #
+
+
+def test_proxy_refuses_twice_then_the_direct_port_runs_the_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen = _patch_ssh(monkeypatch, rcs=[255, 255, 0], direct=("1.2.3.4", 40022))
+    result = runner.invoke(exec_cmd.app, ["12345", "nvidia-smi"])
+    assert result.exit_code == 0
+    assert [(c["host"], c["port"]) for c in seen["exec"]] == [
+        ("h.example", 22), ("h.example", 22), ("1.2.3.4", 40022)]
+    assert seen["fallback"] == [(12345, ("h.example", 22))]
+
+
+def test_no_direct_port_lookup_when_the_proxy_answers(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen = _patch_ssh(monkeypatch, rcs=[0], direct=("1.2.3.4", 40022))
+    result = runner.invoke(exec_cmd.app, ["12345", "nvidia-smi"])
+    assert result.exit_code == 0
+    assert seen["fallback"] == []
 
 
 # ---------- endpoint missing → exit 1, no ssh_exec ------------------------ #
