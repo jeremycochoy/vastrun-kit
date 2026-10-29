@@ -43,6 +43,12 @@ def _destroy_one(inst_id: int) -> bool:
     return destroy.verify_destroyed(inst_id)
 
 
+def _read_direct_marker(inst_id: int, endpoint: tuple[str, int]) -> marker.Marker | None:
+    """The marker over the direct SSH port: the Vast.ai proxy can refuse every connection."""
+    direct = ssh.fallback_endpoint(inst_id, endpoint)
+    return marker.read_marker(*direct) if direct is not None else None
+
+
 def _check_marker(inst_id: int, label: str) -> typer.Exit | None:
     """Run the SPEC §destroy single-ID + LABEL ownership checks. None on pass."""
     endpoint = ssh.resolve_ssh_endpoint(inst_id)
@@ -52,7 +58,7 @@ def _check_marker(inst_id: int, label: str) -> typer.Exit | None:
             f"Re-run with --force to destroy anyway."
         )
     try:
-        m = marker.read_marker(*endpoint)
+        m = marker.read_marker(*endpoint) or _read_direct_marker(inst_id, endpoint)
     except Exception:
         return _fail(
             f"Instance {inst_id} SSH unreachable — cannot verify ownership. "

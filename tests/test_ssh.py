@@ -41,6 +41,44 @@ def test_parse_ssh_endpoint_returns_none_when_both_missing() -> None:
     )
 
 
+# ----- parse_direct_endpoint / fallback_endpoint --------------------------- #
+
+PROXY_AND_DIRECT = {
+    "ssh_host": "ssh8.vast.ai", "ssh_port": 33370, "public_ipaddr": "158.181.52.19 ",
+    "ports": {"22/tcp": [{"HostIp": "0.0.0.0", "HostPort": "40758"}]},
+}
+
+
+def test_parse_direct_endpoint_reads_the_public_ip_and_the_port_map() -> None:
+    assert ssh.parse_direct_endpoint(PROXY_AND_DIRECT) == ("158.181.52.19", 40758)
+
+
+def test_parse_direct_endpoint_returns_none_without_a_port_map() -> None:
+    assert ssh.parse_direct_endpoint({"public_ipaddr": "1.2.3.4"}) is None
+
+
+def test_fallback_endpoint_gives_the_direct_port_after_the_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(ssh.vastai_cli, "run_vastai_raw", lambda args, **kw: PROXY_AND_DIRECT)
+    assert ssh.fallback_endpoint(1, ("ssh8.vast.ai", 33370)) == ("158.181.52.19", 40758)
+
+
+def test_fallback_endpoint_is_none_after_the_direct_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(ssh.vastai_cli, "run_vastai_raw", lambda args, **kw: PROXY_AND_DIRECT)
+    assert ssh.fallback_endpoint(1, ("158.181.52.19", 40758)) is None
+
+
+def test_fallback_endpoint_is_none_when_the_api_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(args, **kw):  # noqa: ANN001, ANN003
+        raise errors.VastaiCliError("api down")
+
+    monkeypatch.setattr(ssh.vastai_cli, "run_vastai_raw", boom)
+    assert ssh.fallback_endpoint(1, ("ssh8.vast.ai", 33370)) is None
+
+
 # ----- get_ssh_info / get_ssh_url_fallback / resolve_ssh_endpoint ---------- #
 
 

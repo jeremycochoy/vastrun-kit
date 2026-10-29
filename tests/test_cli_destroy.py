@@ -53,8 +53,11 @@ def _patch_common(
     marker_obj: object = "unset",
     marker_raises: BaseException | None = None,
     verify: bool = True,
+    direct: tuple[str, int] | None = None,
+    direct_marker: object = None,
 ) -> dict:
-    """Stub the destroy CLI's collaborators."""
+    """Stub the destroy CLI's collaborators. `direct` is the direct SSH port, and
+    `direct_marker` the marker that it reads."""
     seen: dict = {
         "find": [],
         "endpoint": [],
@@ -62,6 +65,7 @@ def _patch_common(
         "destroy_argv": [],
         "verify": [],
         "list": 0,
+        "fallback": [],
     }
 
     def fake_find(inst_id: int) -> dict | None:
@@ -76,7 +80,13 @@ def _patch_common(
         seen["read_marker"].append((host, port))
         if marker_raises is not None:
             raise marker_raises
+        if direct is not None and (host, port) == direct:
+            return direct_marker
         return None if marker_obj == "unset" else marker_obj
+
+    def fake_fallback(inst_id: int, used: tuple[str, int]) -> tuple[str, int] | None:
+        seen["fallback"].append((inst_id, used))
+        return direct
 
     def fake_run_vastai(args: list[str], **kw: object) -> tuple[int, str, str]:
         seen["destroy_argv"].append(list(args))
@@ -89,6 +99,7 @@ def _patch_common(
     monkeypatch.setattr(destroy_cli.instances, "find_instance", fake_find)
     monkeypatch.setattr(destroy_cli.ssh, "resolve_ssh_endpoint", fake_resolve)
     monkeypatch.setattr(destroy_cli.marker, "read_marker", fake_read_marker)
+    monkeypatch.setattr(destroy_cli.ssh, "fallback_endpoint", fake_fallback)
     monkeypatch.setattr(destroy_cli.vastai_cli, "run_vastai", fake_run_vastai)
     monkeypatch.setattr(destroy_cli.destroy, "verify_destroyed", fake_verify)
     return seen
@@ -257,6 +268,21 @@ def test_marker_matches_destroys_and_reports(
     assert seen["verify"] == [12345]
     # Summary in stdout names the id
     assert "Destroyed instance 12345" in result.stdout
+
+
+def test_marker_over_the_direct_port_when_the_proxy_gives_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Vast.ai's SSH proxy can refuse every connection while the direct port answers."""
+    my_marker = marker.Marker(
+        hostname=_me(), label="training-v1", pid=1, created_at="2026-01-01T00:00:00"
+    )
+    seen = _patch_common(monkeypatch, snap=_snap(), marker_obj=None,
+                         direct=("1.2.3.4", 40022), direct_marker=my_marker)
+    result = runner.invoke(destroy_cli.app, ["12345", "training-v1"])
+    assert result.exit_code == 0
+    assert seen["read_marker"] == [("h.example", 22), ("1.2.3.4", 40022)]
+    assert seen["destroy_argv"] == [["destroy", "instance", "12345", "-y"]]
 
 
 def test_marker_matches_unverified_warning_exits_1(

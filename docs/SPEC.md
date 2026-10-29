@@ -270,7 +270,7 @@ Behaviour:
 
 - **No args, no `--all`** → exit 1 to stderr: `Error: provide an INSTANCE_ID + LABEL, or use --all.`
 - **Single ID without `--force` and without `LABEL`** → exit 1 to stderr: `Error: vastrun-destroy <ID> <LABEL> requires both arguments. Pass --force to destroy by ID alone (e.g. when you don't know the label).`
-- **Single ID + `LABEL`, no `--force`**: resolve SSH info; read the marker; refuse with exit 1 if any of these hold (each refusal message names what was found vs. expected and tells the user to re-run with `--force`):
+- **Single ID + `LABEL`, no `--force`**: resolve SSH info; read the marker, over the direct port when the proxy endpoint gives no marker (the Vast.ai proxy can refuse every connection); refuse with exit 1 if any of these hold (each refusal message names what was found vs. expected and tells the user to re-run with `--force`):
   - Marker is missing: `Instance <id> has no marker — it was provisioned outside vastrun-kit. Re-run with --force to destroy anyway.`
   - Marker hostname is not ours: `Instance <id> is owned by host '<other>', not '<me>'. Re-run with --force to destroy anyway.` (See Multi-tenant > Ownership scope.)
   - Marker label is not the provided LABEL: `Instance <id> marker label is '<marker_label>', not '<provided_label>'. Re-run with --force to destroy anyway.`
@@ -474,7 +474,7 @@ Behaviour:
 - Resolve SSH info; exit 1 if not found.
 - Wrap the command by base64-encoding and running `echo '<b64>' | base64 -d | bash` over SSH (survives Vast.ai's SSH proxy, which can mangle compound commands).
 - Stream output (no capture).
-- Exit 255 (SSH failure): retry once after 3s.
+- Exit 255 (SSH failure): retry once after 3s, then once on the direct port (`public_ipaddr` + the host port of `22/tcp`) when it differs from the endpoint used. The Vast.ai proxy can refuse every connection to an instance whose direct port works.
 - Best-effort `Instance <id>: $X.XX spent so far` print; silent on failure.
 - Propagate the command's exit code.
 
@@ -613,7 +613,7 @@ On exhaustion, exit 1 naming the instance ID and the recovery commands.
 
 If `get_ssh_info` returns None and `get_ssh_url_fallback` (parsing `vastai ssh-url`) also returns None, exit 1 with `"Instance N created but SSH info missing from API. Run vastrun-destroy <id> --force to clean up."`.
 
-If `wait_for_ssh` returns False after 15 × 2s tries, exit 1 with `"Instance N created but SSH unreachable at host:port. Run vastrun-destroy <id> --force to clean up."`.
+If `wait_for_ssh` returns False after 15 × 2s tries, wait the same way on the direct port (`public_ipaddr` + the host port of `22/tcp`) when it differs from the endpoint used: the Vast.ai proxy can refuse every connection to an instance whose direct port works. If SSH answers there, the rest of the flow (marker, probe, summary) uses the direct port. Else exit 1 with `"Instance N created but SSH unreachable at host:port[, host:port]. Run vastrun-destroy <id> --force to clean up."`, which names each endpoint tried.
 
 ### Marker write failure during provisioning
 

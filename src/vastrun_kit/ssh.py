@@ -28,12 +28,18 @@ def parse_ssh_endpoint(inst: dict) -> tuple[str, int] | None:
     host, port = inst.get("ssh_host"), inst.get("ssh_port")
     if host and port:
         return str(host), int(port)
+    return parse_direct_endpoint(inst)
+
+
+def parse_direct_endpoint(inst: dict) -> tuple[str, int] | None:
+    """(`public_ipaddr`, `ports['22/tcp'][0]['HostPort']`): the direct SSH port, which skips
+    the Vast.ai proxy. None if the instance does not give both."""
     ip = inst.get("public_ipaddr")
     mapping = (inst.get("ports") or {}).get("22/tcp") or []
     if ip and mapping:
         hp = mapping[0].get("HostPort")
         if hp:
-            return str(ip), int(hp)
+            return str(ip).strip(), int(hp)
     return None
 
 
@@ -62,6 +68,19 @@ def get_ssh_url_fallback(inst_id: int) -> tuple[str, int] | None:
 def resolve_ssh_endpoint(inst_id: int) -> tuple[str, int] | None:
     """get_ssh_info → get_ssh_url_fallback. None if both fail."""
     return get_ssh_info(inst_id) or get_ssh_url_fallback(inst_id)
+
+
+def fallback_endpoint(inst_id: int, used: tuple[str, int]) -> tuple[str, int] | None:
+    """The direct SSH port of the instance when `used` is another endpoint, else None.
+
+    Vast.ai's SSH proxy can refuse every connection to an instance whose direct port
+    answers. A failed API call gives None, so the caller keeps its own error."""
+    try:
+        inst = vastai_cli.run_vastai_raw(["show", "instance", str(inst_id)])
+    except (errors.VastaiCliError, errors.MissingCredentialError):
+        return None
+    direct = parse_direct_endpoint(inst) if isinstance(inst, dict) else None
+    return direct if direct != used else None
 
 
 def _read_pubkey(p: Path) -> str:

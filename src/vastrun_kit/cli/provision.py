@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import sys
 import time
+from typing import NoReturn
 
 import typer
 
@@ -23,7 +24,7 @@ _BALANCE_FLOOR = 0.10
 _DESTROY = "Run vastrun-destroy {} --force to clean up."
 
 
-def _exit1(msg: str) -> None:
+def _exit1(msg: str) -> NoReturn:
     print(f"Error: {msg}", file=sys.stderr)
     raise typer.Exit(code=1)
 
@@ -51,6 +52,21 @@ def _print_success(inst_id: int, host: str, port: int, label: str, spot_bid: flo
     typer.echo("\nNext:")
     typer.echo(f'  vastrun-exec {inst_id} "<command>"  - run a command')
     typer.echo(f"  vastrun-destroy {inst_id} {label}   - tear it down")
+
+
+def _answering_endpoint(inst_id: int, ep: tuple[str, int]) -> tuple[str, int]:
+    """`ep` when SSH answers there, else the direct port when it answers. The Vast.ai
+    proxy can refuse every connection to an instance whose direct port works."""
+    if ssh.wait_for_ssh(*ep):
+        return ep
+    tried = [ep]
+    direct = ssh.fallback_endpoint(inst_id, ep)
+    if direct is not None:
+        if ssh.wait_for_ssh(*direct):
+            return direct
+        tried.append(direct)
+    unreachable = ", ".join(f"{host}:{port}" for host, port in tried)
+    _exit1(f"Instance {inst_id} created but SSH unreachable at {unreachable}. " + _DESTROY.format(inst_id))
 
 
 @app.command()
@@ -113,9 +129,7 @@ def main(
     ep = ssh.resolve_ssh_endpoint(inst_id)
     if ep is None:
         _exit1(f"Instance {inst_id} created but SSH info missing from API. " + _DESTROY.format(inst_id))
-    host, port = ep
-    if not ssh.wait_for_ssh(host, port):
-        _exit1(f"Instance {inst_id} created but SSH unreachable at {host}:{port}. " + _DESTROY.format(inst_id))
+    host, port = _answering_endpoint(inst_id, ep)
 
     try:
         marker.write_marker(host, port, marker.make_marker(label))
