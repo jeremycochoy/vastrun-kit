@@ -14,13 +14,19 @@ Vast.ai is cheap (RTX 4090 ≈ $0.35/h) but the raw API is flaky — machines fa
 - **Two-step flow**: `vastrun-search` lists offers, you (or your agent) pick one, `vastrun-provision <OFFER_ID> --label NAME` creates exactly one instance from it.
 - **On-instance ownership marker** so co-resident agents on the same Vast.ai account don't destroy each other's work.
 
+## Package age rule
+
+Do not install a PyPI, npm, Cargo or Go package version that is less than 7 days old. A new release can contain malware.
+Use this limit for each installation: `--uploaded-prior-to=P7D` with pip 26.1 or later, `exclude-newer = "7 days"` with uv, and `min-release-age=7` with npm 11.10 or later.
+Stable Cargo and Go have no such setting. For each new or updated crate or Go module, the author checks its release date, and the reviewer refuses a version that is less than 7 days old.
+
 ## Install
 
 ```bash
 git clone git@github.com:jeremycochoy/vastrun-kit.git
 cd vastrun-kit
 echo 'VASTAI_API_TOKEN=<your key>' > .env
-uv tool install --editable .
+uv tool install --exclude-newer "7 days" --editable .
 ```
 
 Sign up at [vast.ai](https://vast.ai/), top up, and add your SSH public key under Keys.
@@ -125,7 +131,7 @@ ssh_key           = "~/.ssh/id_ed25519.pub"
 
 **Private images:** set `VASTRUN_REGISTRY_USERNAME` and `VASTRUN_REGISTRY_TOKEN` (same sources as `VASTAI_API_TOKEN`; never in `.vastrun.toml`). `vastrun-provision` then passes `--login "-u USER -p TOKEN REGISTRY"` to `vastai create instance`, so the host can pull the image. `REGISTRY` comes from the image name (`docker.io` when the name has no registry host). The rented host receives the token: give it a read-only token. While `vastai create instance` runs, the token is on its command line, as the API key is. Set both variables or neither.
 
-**PyTorch:** the default images ship torch preinstalled (2.9.1, cu128 / cu130 matching the GPU), so `import torch` works out of the box, and `pip install -r requirements.txt` leaves torch untouched as long as the file's torch floor is ≤ 2.9.1. If you need a *different* torch, install it from the matching CUDA channel (e.g. `--index-url https://download.pytorch.org/whl/cu128`) — a bare `pip install torch==X` may pull a wheel for a different CUDA.
+**PyTorch:** the default images ship torch preinstalled (2.9.1, cu128 / cu130 matching the GPU), so `import torch` works out of the box, and `pip install -r requirements.txt` leaves torch untouched as long as the file's torch floor is ≤ 2.9.1. If you need a *different* torch, install it from PyPI with the age limit: `pip install --uploaded-prior-to=P7D torch==X`. The PyPI wheels bundle their CUDA libraries. The PyTorch index (`download.pytorch.org`) gives no upload times, so pip and uv refuse its files under the [package age rule](#package-age-rule).
 
 ## Multi-agent safety
 
