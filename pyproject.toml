@@ -41,3 +41,7 @@ markers = [
     "integration: hits the live Vast.ai API, needs VASTAI_API_TOKEN",
 ]
 addopts = "-q"
+
+[tool.uv]
+# Package age rule (README.md): resolve no package version that is less than 7 days old.
+exclude-newer = "7 days"

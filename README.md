@@ -14,13 +14,18 @@ Vast.ai is cheap (RTX 4090 ≈ $0.35/h) but the raw API is flaky — machines fa
 - **Two-step flow**: `vastrun-search` lists offers, you (or your agent) pick one, `vastrun-provision <OFFER_ID> --label NAME` creates exactly one instance from it.
 - **On-instance ownership marker** so co-resident agents on the same Vast.ai account don't destroy each other's work.
 
+## Package age rule
+
+Do not install a PyPI or npm package version that is less than 7 days old. A new release can contain malware.
+Use this limit for each installation: `--uploaded-prior-to=P7D` with pip 26.1 or later, `exclude-newer = "7 days"` with uv, and `min-release-age=7` with npm 11.10 or later.
+
 ## Install
 
 ```bash
 git clone git@github.com:jeremycochoy/vastrun-kit.git
 cd vastrun-kit
 echo 'VASTAI_API_TOKEN=<your key>' > .env
-uv tool install --editable .
+uv tool install --exclude-newer "7 days" --editable .
 ```
 
 Sign up at [vast.ai](https://vast.ai/), top up, and add your SSH public key under Keys.
